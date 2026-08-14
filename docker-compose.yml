@@ -1,6 +1,6 @@
 services:
   pgsentinel:
-    image: ${PGSENTINEL_IMAGE:-ghcr.io/matta813/pgsentinel}:${PGSENTINEL_VERSION:-0.1.0}
+    image: ${PGSENTINEL_IMAGE:-ghcr.io/matta813/pgsentinel}:${PGSENTINEL_VERSION:-0.1.1}
     container_name: pgsentinel
     restart: unless-stopped
     read_only: true
