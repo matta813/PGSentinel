@@ -84,6 +84,7 @@ build:
 
 publish-release:
   stage: release
+  interruptible: false
   image: docker:29-cli
   services: [docker:29-dind]
   variables:
