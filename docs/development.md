@@ -14,6 +14,14 @@ Add migrations as ordered files under `migrations/`. Rules should be determinist
 
 Use Conventional Commits. Keep generated output, databases, `.env` and credentials out of Git. Validate with `git diff --check` before pushing.
 
+Credential encryption has a native Go fuzz target covering arbitrary plaintext round trips and ciphertext tampering. Run a bounded campaign locally with:
+
+```bash
+go test ./internal/storage -run=^$ -fuzz=^FuzzCipherRoundTrip$ -fuzztime=30s
+```
+
+GitHub Actions runs the same campaign for relevant pull requests, weekly, and on manual dispatch.
+
 ## Dependency updates
 
 Dependencies are monitored by GitHub's native Dependabot using [`.github/dependabot.yml`](../.github/dependabot.yml). It checks Go modules and checksums, npm manifests and `package-lock.json`, Dockerfile/Compose images, and GitHub Actions every day at 04:00 Europe/Zurich. All updates use `dependabot/*` pull requests; the bot never commits directly to `main`.
