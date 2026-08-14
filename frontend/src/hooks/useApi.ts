@@ -1,0 +1,2 @@
+import{useCallback,useEffect,useState}from'react';export function useApi<T>(load:()=>Promise<T>,deps:unknown[]=[]){const[data,setData]=useState<T>();const[error,setError]=useState<Error>();const[loading,setLoading]=useState(true);const reload=useCallback(()=>{setLoading(true);setError(undefined);return load().then(setData).catch((e:unknown)=>setError(e instanceof Error?e:new Error('Unknown error'))).finally(()=>setLoading(false))},deps);// eslint-disable-next-line react-hooks/exhaustive-deps
+useEffect(()=>{void reload()},[reload]);return{data,error,loading,reload}}
