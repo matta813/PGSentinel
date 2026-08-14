@@ -7,6 +7,8 @@ import (
 	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -36,6 +38,17 @@ func (a *API) routes() {
 	a.mux.HandleFunc("GET /api/v1/overview", a.overview)
 	a.mux.HandleFunc("POST /api/v1/notifications/test", a.testNotification)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}/{resource}", a.serverResource)
+}
+
+func (a *API) ServeFrontend(directory string) {
+	a.mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		path := filepath.Join(directory, filepath.Clean(r.URL.Path))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, path)
+			return
+		}
+		http.ServeFile(w, r, filepath.Join(directory, "index.html"))
+	})
 }
 func write(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")

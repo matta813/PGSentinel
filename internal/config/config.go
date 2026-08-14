@@ -19,6 +19,7 @@ type Config struct {
 	SlowInterval  time.Duration
 	MetaInterval  time.Duration
 	Retention     time.Duration
+	FrontendDir   string
 }
 
 func Load() (Config, error) {
@@ -29,7 +30,8 @@ func Load() (Config, error) {
 		EncryptionKey: os.Getenv("PGSENTINEL_ENCRYPTION_KEY"), LogLevel: env("PGSENTINEL_LOG_LEVEL", "info"),
 		FastInterval: duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
 		SlowInterval: duration("PGSENTINEL_SLOW_INTERVAL", 5*time.Minute), MetaInterval: duration("PGSENTINEL_META_INTERVAL", 30*time.Minute),
-		Retention: duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
+		Retention:   duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
+		FrontendDir: env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
 	}
 	if c.EncryptionKey == "" {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY is required; generate one with openssl rand -base64 32")

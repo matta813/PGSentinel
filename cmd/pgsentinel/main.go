@@ -38,7 +38,9 @@ func main() {
 	defer stop()
 	manager := collector.NewManager(store, log, cfg.StatsInterval)
 	go manager.Run(ctx)
-	server := &http.Server{Addr: cfg.ListenAddr, Handler: api.New(store, log).Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+	app := api.New(store, log)
+	app.ServeFrontend(cfg.FrontendDir)
+	server := &http.Server{Addr: cfg.ListenAddr, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
