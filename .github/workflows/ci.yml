@@ -41,7 +41,7 @@ jobs:
         run: go vet ./...
       - name: Test
         run: go test -race -coverprofile=coverage.out ./...
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: coverage.out
@@ -74,7 +74,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - run: CGO_ENABLED=0 go build -trimpath -o pgsentinel ./cmd/pgsentinel
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: pgsentinel-linux-amd64
           path: pgsentinel
