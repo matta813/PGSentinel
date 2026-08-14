@@ -61,6 +61,7 @@ To restore, stop the service, copy the database back, and start it again. Preser
 
 ## Production hardening
 
+- Keep the root filesystem read-only, drop all Linux capabilities, enable `no-new-privileges`, and mount only `/data` writable. The supplied Compose service configures these controls and a small non-executable `/tmp` tmpfs.
 - Keep `PGSENTINEL_ENCRYPTION_KEY` outside Compose files and source control.
 - Publish port `8080` only to a trusted management network or place it behind an authenticated TLS reverse proxy.
 - Restrict outbound network access to monitored PostgreSQL servers and configured notification endpoints.
