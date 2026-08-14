@@ -25,6 +25,8 @@ Dependencies are monitored by GitHub's native Dependabot using [`.github/dependa
 
 At most five pull requests per ecosystem remain open. Dependabot uses the package manager's existing version constraints and does not convert the project wholesale to exact pins.
 
+GitHub Actions and Docker base images are pinned to immutable commit SHAs or image digests. The readable version comment or image tag remains alongside the pin, and Dependabot updates both together. This prevents a moved upstream tag from changing a trusted CI or release build without review.
+
 `RELEASE` is not a dependency manifest and is absent from every Dependabot ecosystem. Dependabot never changes product versions, creates release tags, or publishes release images. Pull requests run lint, tests, and application builds, while the release workflow requires a direct `main` push changing `RELEASE`.
 
 Dependabot never enables auto-merge and no merge token or Actions secret is required. Protect `main` with a GitHub ruleset, require the CI jobs as status checks, and review every dependency pull request before merging it.

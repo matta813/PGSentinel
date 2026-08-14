@@ -41,6 +41,10 @@ services:
     image: ghcr.io/matta813/pgsentinel:0.1.0
     container_name: pgsentinel
     restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:rw,noexec,nosuid,nodev,size=64m]
     ports: ["8080:8080"]
     volumes: ["./data:/data"]
     environment:
