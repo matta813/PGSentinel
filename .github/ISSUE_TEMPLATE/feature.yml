@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a focused improvement to PGSentinel
+title: "feat: "
+labels: ["enhancement", "status: needs triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What operational decision is difficult today, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Explain the evidence, impact, and next action PGSentinel should provide.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe workarounds or other approaches you considered.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Project principles
+      options:
+        - label: This proposal does not require automatic destructive database changes.
+          required: true
+        - label: I searched existing issues and discussions for similar proposals.
+          required: true
