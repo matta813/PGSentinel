@@ -31,6 +31,7 @@ release-validation:
   rules: &release_rules
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       changes: [RELEASE]
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RETRY_RELEASE == "true"'
     - when: never
 
 release-logic-test:
