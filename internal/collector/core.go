@@ -11,6 +11,18 @@ import (
 
 type Core struct{ db *pgxpool.Pool }
 
+const connectionsSQL = `
+SELECT
+  count(*) FILTER (WHERE state = 'active'),
+  count(*) FILTER (WHERE state = 'idle'),
+  count(*) FILTER (WHERE state = 'idle in transaction'),
+  count(*) FILTER (WHERE wait_event IS NOT NULL),
+  count(*),
+  (SELECT setting::int FROM pg_settings WHERE name = 'max_connections'),
+  COALESCE(EXTRACT(EPOCH FROM now() - (min(xact_start) FILTER (WHERE xact_start IS NOT NULL))), 0),
+  COALESCE(EXTRACT(EPOCH FROM now() - (min(state_change) FILTER (WHERE state = 'idle in transaction'))), 0)
+FROM pg_stat_activity`
+
 func NewCore(db *pgxpool.Pool) *Core { return &Core{db: db} }
 func (c *Core) Collect(ctx context.Context, serverID string) (models.Snapshot, error) {
 	s := models.Snapshot{ServerID: serverID, CollectedAt: time.Now().UTC(), Settings: map[string]string{}, Capabilities: map[string]bool{}}
@@ -26,7 +38,7 @@ func (c *Core) Collect(ctx context.Context, serverID string) (models.Snapshot, e
 	return s, nil
 }
 func (c *Core) connections(ctx context.Context, s *models.Snapshot) error {
-	return c.db.QueryRow(ctx, `SELECT count(*) FILTER(WHERE state='active'),count(*) FILTER(WHERE state='idle'),count(*) FILTER(WHERE state='idle in transaction'),count(*) FILTER(WHERE wait_event IS NOT NULL),count(*),(SELECT setting::int FROM pg_settings WHERE name='max_connections'),COALESCE(EXTRACT(EPOCH FROM now()-min(xact_start)) FILTER(WHERE xact_start IS NOT NULL),0),COALESCE(EXTRACT(EPOCH FROM now()-min(state_change)) FILTER(WHERE state='idle in transaction'),0) FROM pg_stat_activity`).Scan(&s.Connections.Active, &s.Connections.Idle, &s.Connections.IdleInTransaction, &s.Connections.Waiting, &s.Connections.Total, &s.Connections.Max, &s.Connections.LongestTransactionSeconds, &s.Connections.LongestIdleTransactionSeconds)
+	return c.db.QueryRow(ctx, connectionsSQL).Scan(&s.Connections.Active, &s.Connections.Idle, &s.Connections.IdleInTransaction, &s.Connections.Waiting, &s.Connections.Total, &s.Connections.Max, &s.Connections.LongestTransactionSeconds, &s.Connections.LongestIdleTransactionSeconds)
 }
 func (c *Core) databases(ctx context.Context, s *models.Snapshot) error {
 	rows, err := c.db.Query(ctx, `SELECT datname,pg_database_size(datname),xact_commit,xact_rollback,deadlocks,temp_files,temp_bytes,blks_read,blks_hit FROM pg_stat_database WHERE datname IS NOT NULL ORDER BY datname`)
