@@ -1,0 +1,9 @@
+services:
+  pgsentinel:
+    build:
+      context: .
+      args:
+        VERSION: dev
+        COMMIT_SHA: local
+        BUILD_TIME: local
+    image: pgsentinel:local

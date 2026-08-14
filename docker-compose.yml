@@ -1,13 +1,13 @@
 services:
   pgsentinel:
-    build: .
-    image: pgsentinel:local
+    image: ${PGSENTINEL_IMAGE:-ghcr.io/matta813/pgsentinel}:${PGSENTINEL_VERSION:-0.1.0}
+    container_name: pgsentinel
     restart: unless-stopped
     ports: ["8080:8080"]
     environment:
       TZ: Europe/Zurich
-      PGSENTINEL_ENCRYPTION_KEY: ${PGSENTINEL_ENCRYPTION_KEY:-development-only-change-this-key}
-      PGSENTINEL_STATS_INTERVAL: 30s
+      PGSENTINEL_ENCRYPTION_KEY: ${PGSENTINEL_ENCRYPTION_KEY:?set PGSENTINEL_ENCRYPTION_KEY}
+      PGSENTINEL_STATS_INTERVAL: ${PGSENTINEL_STATS_INTERVAL:-30s}
     volumes: [pgsentinel-data:/data]
 volumes:
   pgsentinel-data:
