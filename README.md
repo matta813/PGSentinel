@@ -31,7 +31,7 @@ Minimal deployment:
 ```yaml
 services:
   pgsentinel:
-    image: registry.gitlab.scruzzi.com/root/postgresqlui:latest
+    image: registry.gitlab.scruzzi.com/root/postgresqlui:0.1.0
     container_name: pgsentinel
     restart: unless-stopped
     ports: ["8080:8080"]
@@ -70,6 +70,27 @@ After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and e
 | `PGSENTINEL_LOG_LEVEL` | `info` | `info` or `debug` structured JSON logging |
 
 Passwords, tokens, and full connection URLs are never logged or returned by normal APIs. Normalized `pg_stat_statements.query` text can still contain literals for statements that PostgreSQL cannot normalize; treat database access as sensitive.
+
+## Releases
+
+[`RELEASE`](RELEASE) is the single source of truth. To publish, change its sole line to a greater Semantic Version and push that commit to `main`:
+
+```bash
+printf '0.3.0\n' > RELEASE
+git add RELEASE
+git commit -m "chore: release 0.3.0"
+git push origin main
+```
+
+After lint, tests and builds pass, GitLab exclusively for that version change publishes `:0.3.0`, `:v0.3.0`, and—for stable versions—`:latest`. It then creates Git tag and GitLab Release `v0.3.0` with grouped Conventional Commit notes. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal commits, merge requests, branches and tag pipelines do not build a container.
+
+Pin production deployments to a version:
+
+```bash
+docker pull registry.gitlab.scruzzi.com/root/postgresqlui:0.3.0
+```
+
+`latest` is convenient for evaluation but moves on every stable release. See [release workflow, permissions, and troubleshooting](docs/releases.md).
 
 ## Development
 
