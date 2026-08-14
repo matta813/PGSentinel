@@ -19,7 +19,7 @@ ARG COMMIT_SHA=unknown
 ARG BUILD_TIME=unknown
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X gitlab.scruzzi.com/root/postgresqlui/internal/buildinfo.Version=${VERSION} -X gitlab.scruzzi.com/root/postgresqlui/internal/buildinfo.CommitSHA=${COMMIT_SHA} -X gitlab.scruzzi.com/root/postgresqlui/internal/buildinfo.BuildTime=${BUILD_TIME}" -o /out/pgsentinel ./cmd/pgsentinel
 
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata && addgroup -S -g 10001 pgsentinel && adduser -S -D -H -u 10001 -G pgsentinel pgsentinel
 WORKDIR /app
 COPY --from=backend /out/pgsentinel /usr/local/bin/pgsentinel

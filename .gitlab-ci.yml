@@ -19,7 +19,7 @@ variables:
 
 release-validation:
   stage: validate
-  image: alpine:3.23
+  image: alpine:3.24
   before_script: ["apk add --no-cache git"]
   script:
     - git fetch --tags --force
@@ -35,7 +35,7 @@ release-validation:
 
 release-logic-test:
   stage: validate
-  image: alpine:3.23
+  image: alpine:3.24
   before_script: ["apk add --no-cache git"]
   script:
     - SKIP_REMOTE_CHECK=true ./scripts/validate-release.sh RELEASE
