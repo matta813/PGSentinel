@@ -2,7 +2,7 @@ package analyzer
 
 import (
 	"fmt"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"github.com/matta813/pgsentinel/internal/models"
 	"regexp"
 	"strings"
 )

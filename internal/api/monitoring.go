@@ -2,8 +2,8 @@ package api
 
 import (
 	"database/sql"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/analyzer"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"github.com/matta813/pgsentinel/internal/analyzer"
+	"github.com/matta813/pgsentinel/internal/models"
 	"net/http"
 )
 

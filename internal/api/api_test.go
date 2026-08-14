@@ -3,7 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
+	"github.com/matta813/pgsentinel/internal/storage"
 	"io"
 	"log/slog"
 	"net/http"

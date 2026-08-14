@@ -16,16 +16,15 @@ Use Conventional Commits. Keep generated output, databases, `.env` and credentia
 
 ## Dependency updates
 
-Dependencies are monitored by a scheduled self-hosted Renovate job in this project's GitLab pipeline. The separate `root/renovate-runner` repository remains a reusable central-runner template, but the active schedule is colocated because the least-privilege Project Access Token is intentionally scoped to PGSentinel. Renovate reads [`renovate.json`](../renovate.json), updates Go modules and checksums, npm manifests and `package-lock.json`, Dockerfile/Compose images, and GitLab CI images through `renovate/*` merge requests.
+Dependencies are monitored by GitHub's native Dependabot using [`.github/dependabot.yml`](../.github/dependabot.yml). It checks Go modules and checksums, npm manifests and `package-lock.json`, Dockerfile/Compose images, and GitHub Actions every day at 04:00 Europe/Zurich. All updates use `dependabot/*` pull requests; the bot never commits directly to `main`.
 
-- Patch, digest, and pin updates may use GitLab platform automerge only after every required pipeline and branch-protection condition succeeds.
-- Minor updates always wait for human review.
-- Major updates require explicit approval in the Dependency Dashboard before Renovate creates an MR.
-- Vulnerability remediation bypasses normal schedules and rate limits, carries the `security` label, but major security updates are not blindly automerged.
-- Lockfile maintenance runs at most monthly and requires review.
+- Patch updates are grouped by ecosystem, but always wait for human review.
+- Minor and major updates also always wait for human review.
+- GitHub creates security update pull requests independently of the version-update schedule when Dependabot security updates are enabled.
+- Manifest and lockfile changes are committed together in the same pull request.
 
-Normal updates wait three days after upstream publication. The existing `rangeStrategy: auto` preserves the project's range style instead of converting every dependency to an exact pin. Five Renovate MRs may be open concurrently and no more than two are created per hour.
+At most five pull requests per ecosystem remain open. Dependabot uses the package manager's existing version constraints and does not convert the project wholesale to exact pins.
 
-`RELEASE` is explicitly ignored and has no custom/regex manager. Renovate never changes product versions, creates release tags, or publishes release images. Because release CI jobs require a direct `main` push that changes only the effective `RELEASE` version, Renovate MRs run lint, tests, and application build without a Docker release.
+`RELEASE` is not a dependency manifest and is absent from every Dependabot ecosystem. Dependabot never changes product versions, creates release tags, or publishes release images. Pull requests run lint, tests, and application builds, while the release workflow requires a direct `main` push changing `RELEASE`.
 
-Automerge never bypasses approvals, merge conflicts, protected branches, or required GitLab pipelines. If project settings require approvals that the bot cannot satisfy, patch MRs remain open; retain those protections and merge manually.
+Dependabot never enables auto-merge and no merge token or Actions secret is required. Protect `main` with a GitHub ruleset, require the CI jobs as status checks, and review every dependency pull request before merging it.

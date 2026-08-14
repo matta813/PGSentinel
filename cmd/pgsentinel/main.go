@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.scruzzi.com/root/postgresqlui/internal/api"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/buildinfo"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/collector"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/config"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
+	"github.com/matta813/pgsentinel/internal/api"
+	"github.com/matta813/pgsentinel/internal/buildinfo"
+	"github.com/matta813/pgsentinel/internal/collector"
+	"github.com/matta813/pgsentinel/internal/config"
+	"github.com/matta813/pgsentinel/internal/storage"
 )
 
 func main() {

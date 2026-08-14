@@ -1,7 +1,7 @@
 package analyzer
 
 import (
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"github.com/matta813/pgsentinel/internal/models"
 	"testing"
 )
 

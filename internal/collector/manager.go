@@ -2,10 +2,10 @@ package collector
 
 import (
 	"context"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/analyzer"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
-	pg "gitlab.scruzzi.com/root/postgresqlui/internal/postgres"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
+	"github.com/matta813/pgsentinel/internal/analyzer"
+	"github.com/matta813/pgsentinel/internal/models"
+	pg "github.com/matta813/pgsentinel/internal/postgres"
+	"github.com/matta813/pgsentinel/internal/storage"
 	"log/slog"
 	"sync"
 	"time"

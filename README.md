@@ -15,7 +15,7 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 - ntfy and generic webhook delivery tests
 - Responsive professional light/dark React interface
 - SQLite WAL storage, migrations and 30-day raw snapshot retention
-- One production container, health/readiness endpoints and GitLab CI
+- One production container, health/readiness endpoints and GitHub Actions CI
 
 ## Quick start
 
@@ -31,7 +31,7 @@ Minimal deployment:
 ```yaml
 services:
   pgsentinel:
-    image: registry.gitlab.scruzzi.com/root/postgresqlui:0.1.0
+    image: ghcr.io/matta813/pgsentinel:0.1.0
     container_name: pgsentinel
     restart: unless-stopped
     ports: ["8080:8080"]
@@ -82,12 +82,12 @@ git commit -m "chore: release 0.3.0"
 git push origin main
 ```
 
-After lint, tests and builds pass, GitLab exclusively for that version change publishes `:0.3.0`, `:v0.3.0`, and—for stable versions—`:latest`. It then creates Git tag and GitLab Release `v0.3.0` with grouped Conventional Commit notes. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal commits, merge requests, branches and tag pipelines do not build a container.
+After lint, tests and builds pass, GitHub Actions exclusively for that version change publishes `:0.3.0`, `:v0.3.0`, and—for stable versions—`:latest` to GHCR. It then creates Git tag and GitHub Release `v0.3.0` with grouped Conventional Commit notes. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal commits, pull requests, branches and tag events do not build a container.
 
 Pin production deployments to a version:
 
 ```bash
-docker pull registry.gitlab.scruzzi.com/root/postgresqlui:0.3.0
+docker pull ghcr.io/matta813/pgsentinel:0.3.0
 ```
 
 `latest` is convenient for evaluation but moves on every stable release. See [release workflow, permissions, and troubleshooting](docs/releases.md).
@@ -123,4 +123,4 @@ Contributions are welcome. Please run `make test lint` and keep recommendations 
 
 ## Dependency updates
 
-Renovate monitors Go, npm, Docker/Compose and GitLab CI dependencies through merge requests. Patch updates can merge only after the complete protected GitLab CI succeeds; minor updates require review and major updates require Dependency Dashboard approval. Product releases remain separate: Renovate explicitly ignores `RELEASE` and cannot trigger release image publication. Operational details are in the [development guide](docs/development.md#dependency-updates).
+Dependabot monitors Go, npm, Docker/Compose and GitHub Actions dependencies through pull requests. All updates—including patches and security fixes—require manual review and merge. Product releases remain separate: Dependabot never edits `RELEASE` and cannot trigger image publication. Operational details are in the [development guide](docs/development.md#dependency-updates).

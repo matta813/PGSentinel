@@ -1,4 +1,4 @@
-module gitlab.scruzzi.com/root/postgresqlui
+module github.com/matta813/pgsentinel
 
 go 1.26
 

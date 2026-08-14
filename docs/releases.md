@@ -15,31 +15,28 @@ git push origin main
 
 ## Pipeline behavior
 
-Normal pipelines run Go and frontend lint, tests, and production builds. `release-validation` and `publish-release` exist only for a direct push to the default branch where `RELEASE` changed. Tag pipelines are disabled at workflow level, preventing a release loop. `resource_group: production-release` serializes publication.
+The `CI` workflow runs Go and frontend lint, tests, and production builds for `main` and pull requests. The separate `Release` workflow runs only for a direct push to `main` where `RELEASE` changed, or an explicit recovery dispatch. It does not listen for tags, preventing a release loop. GitHub Actions concurrency serializes publication.
 
-Publication order is image build, version image push, `v` image push, optional `latest` push, then GitLab release/tag creation. `glab release create` creates the tag from the exact `CI_COMMIT_SHA`; when a release exists it updates it, making the final operation idempotent. Image tags are safe to repush. Validation normally stops duplicate tags before expensive work.
+Publication order is verification, image build, version image push, `v` image push, optional `latest` push, then GitHub release/tag creation from the exact commit SHA. A recovery dispatch may safely repush image tags and repairs an existing release record instead of creating a duplicate. Normal release validation rejects an existing tag before expensive work.
 
 ## Image tags
 
-Stable `0.4.2` produces `$CI_REGISTRY_IMAGE:0.4.2`, `$CI_REGISTRY_IMAGE:v0.4.2`, and `$CI_REGISTRY_IMAGE:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
+Stable `0.4.2` produces `ghcr.io/matta813/pgsentinel:0.4.2`, `:v0.4.2`, and `:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
 
 Build arguments embed version, commit SHA and UTC build time. They are visible at `GET /api/v1/version` and in the sidebar. Local builds remain `dev`, `unknown`, `unknown`.
 
 ## Authentication and protection
 
-Registry login uses `CI_REGISTRY_USER` and `CI_REGISTRY_PASSWORD`. Release/tag creation uses `CI_JOB_TOKEN` through `GLAB_ENABLE_CI_AUTOLOGIN=true`; current `glab` sends the Releases API-compatible `JOB-TOKEN` header. Do not assign `CI_JOB_TOKEN` to `GITLAB_TOKEN`.
+The release job uses GitHub's short-lived `GITHUB_TOKEN`; no long-lived release secret is required. Its job-scoped permissions are limited to `contents: write` for the tag/release and `packages: write` for GHCR. All other workflows default to `contents: read`.
 
-If the GitLab instance disallows this job-token operation, create a masked, protected project/group access token named `GITLAB_TOKEN` with `api` scope and at least Developer role. `glab` automatically uses it. Never commit it.
-
-Recommended settings: protect `main`, protect `v*` tags while allowing release automation, keep optional variables protected/masked, and ensure the runner can push to the Container Registry.
+Recommended settings: protect `main` with a GitHub ruleset, require the CI checks and reviews, grant the release workflow write access through `GITHUB_TOKEN`, and keep GHCR linked to this repository. Dependabot updates remain manual.
 
 ## Troubleshooting
 
 - **Invalid version:** run `./scripts/test-release.sh` and `./scripts/validate-release.sh RELEASE`.
 - **Version went backwards:** choose a version greater than the newest release under SemVer precedence.
 - **Tag exists:** never reuse versions. For a partial publication, verify the tag target before repairing the release record.
-- **Registry denied:** verify Registry enablement and standard CI registry variables.
-- **Registry reports `blob unknown`:** the release build disables BuildKit's optional provenance manifest for compatibility with older self-hosted registries.
-- **Release API 404:** enable job-token Releases API access or add protected `GITLAB_TOKEN`.
+- **Registry denied:** ensure GitHub Actions has `packages: write` and the package is linked to this repository.
+- **Release API denied:** ensure the workflow has `contents: write` and repository Actions are allowed write access.
 - **No release jobs:** ensure this is a direct push to `main` and `RELEASE` actually changed.
-- **Retry after infrastructure failure:** run a new pipeline on `main` with `RETRY_RELEASE=true`, either in GitLab or with `glab ci run -b main --variables RETRY_RELEASE:true`. This uses the current CI definition, revalidates the version/tag, and safely republishes image tags before creating the GitLab Release. Do not retry an old job when its CI configuration itself was faulty.
+- **Retry after infrastructure failure:** open **Actions → Release → Run workflow**, select `main`, and enable `recover`. This uses the current workflow, safely republishes image tags, and creates or repairs the GitHub Release. Do not rerun an old job when its workflow definition itself was faulty.
