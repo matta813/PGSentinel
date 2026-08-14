@@ -1,0 +1,107 @@
+package storage
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"time"
+)
+
+func (s *Store) SaveSnapshot(ctx context.Context, serverID, kind string, value any, at time.Time) error {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO snapshots(server_id,kind,payload_json,collected_at) VALUES(?,?,?,?)`, serverID, kind, string(body), at.Format(time.RFC3339Nano))
+	return err
+}
+func (s *Store) LatestSnapshot(ctx context.Context, serverID, kind string, dst any) error {
+	var body string
+	err := s.DB.QueryRowContext(ctx, `SELECT payload_json FROM snapshots WHERE server_id=? AND kind=? ORDER BY collected_at DESC LIMIT 1`, serverID, kind).Scan(&body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(body), dst)
+}
+func (s *Store) UpsertFindings(ctx context.Context, serverID string, findings []models.Finding) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	seen := map[string]bool{}
+	for _, f := range findings {
+		seen[f.Fingerprint] = true
+		evidence, _ := json.Marshal(f.Evidence)
+		suggestions, _ := json.Marshal(f.Suggestions)
+		_, err = tx.ExecContext(ctx, `INSERT INTO findings(id,rule_id,fingerprint,server_id,database_name,resource,severity,category,title,summary,cause,impact,evidence_json,suggestions_json,confidence,status,started_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET severity=excluded.severity,title=excluded.title,summary=excluded.summary,cause=excluded.cause,impact=excluded.impact,evidence_json=excluded.evidence_json,suggestions_json=excluded.suggestions_json,confidence=excluded.confidence,status='active',updated_at=excluded.updated_at,resolved_at=NULL`, f.ID, f.RuleID, f.Fingerprint, f.ServerID, f.Database, f.Resource, f.Severity, f.Category, f.Title, f.Summary, f.Cause, f.Impact, string(evidence), string(suggestions), f.Confidence, "active", f.StartedAt.Format(time.RFC3339Nano), f.UpdatedAt.Format(time.RFC3339Nano))
+		if err != nil {
+			return err
+		}
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT fingerprint FROM findings WHERE server_id=? AND status='active'`, serverID)
+	if err != nil {
+		return err
+	}
+	var stale []string
+	for rows.Next() {
+		var fp string
+		if err = rows.Scan(&fp); err != nil {
+			rows.Close()
+			return err
+		}
+		if !seen[fp] {
+			stale = append(stale, fp)
+		}
+	}
+	rows.Close()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, fp := range stale {
+		if _, err = tx.ExecContext(ctx, `UPDATE findings SET status='resolved',resolved_at=?,updated_at=? WHERE fingerprint=?`, now, now, fp); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+func (s *Store) ListFindings(ctx context.Context, status, serverID string) ([]models.Finding, error) {
+	q := `SELECT id,rule_id,fingerprint,server_id,database_name,resource,severity,category,title,summary,cause,impact,evidence_json,suggestions_json,confidence,status,started_at,updated_at,resolved_at FROM findings WHERE 1=1`
+	args := []any{}
+	if status != "" {
+		q += " AND status=?"
+		args = append(args, status)
+	}
+	if serverID != "" {
+		q += " AND server_id=?"
+		args = append(args, serverID)
+	}
+	q += " ORDER BY CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END, updated_at DESC"
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []models.Finding{}
+	for rows.Next() {
+		var f models.Finding
+		var ev, su, started, updated string
+		var resolved sql.NullString
+		if err := rows.Scan(&f.ID, &f.RuleID, &f.Fingerprint, &f.ServerID, &f.Database, &f.Resource, &f.Severity, &f.Category, &f.Title, &f.Summary, &f.Cause, &f.Impact, &ev, &su, &f.Confidence, &f.Status, &started, &updated, &resolved); err != nil {
+			return nil, err
+		}
+		json.Unmarshal([]byte(ev), &f.Evidence)
+		json.Unmarshal([]byte(su), &f.Suggestions)
+		f.StartedAt, _ = time.Parse(time.RFC3339Nano, started)
+		f.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
+		if resolved.Valid {
+			v, _ := time.Parse(time.RFC3339Nano, resolved.String)
+			f.ResolvedAt = &v
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+func (s *Store) Prune(ctx context.Context, before time.Time) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM snapshots WHERE collected_at < ?`, before.Format(time.RFC3339Nano))
+	return err
+}
