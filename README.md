@@ -24,7 +24,7 @@ export PGSENTINEL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 docker compose up --build
 ```
 
-Open <http://localhost:8080>. The compose stack also starts PostgreSQL 18 with `pg_stat_statements` and a demo monitoring role. Add it in **Servers** using host `postgres-test`, port `5432`, user `pgsentinel`, password `pgsentinel-demo-only`, and SSL mode `disable`.
+Open <http://localhost:8080>, then add an existing PostgreSQL server under **Servers**. The Compose stack starts only PGSentinel and does not provision or modify a PostgreSQL instance.
 
 Minimal deployment:
 
