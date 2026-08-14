@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [RELEASE]
+  workflow_dispatch:
+    inputs:
+      recover:
+        description: Republish the current version after a partial release failure
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      stable: ${{ steps.release.outputs.stable }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: release
+        name: Validate release version
+        env:
+          SKIP_REMOTE_CHECK: ${{ github.event_name == 'workflow_dispatch' && inputs.recover && 'true' || 'false' }}
+        run: |
+          previous_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
+          PREVIOUS_VERSION="${previous_tag#v}" ./scripts/validate-release.sh RELEASE
+          . ./release.env
+          {
+            echo "version=$RELEASE_VERSION"
+            echo "tag=$RELEASE_TAG"
+            echo "stable=$RELEASE_STABLE"
+          } >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: npm ci --prefix frontend
+      - run: npm --prefix frontend run lint
+      - run: npm --prefix frontend run typecheck
+      - run: npm --prefix frontend test -- --run
+      - run: npm --prefix frontend run build
+      - run: CGO_ENABLED=0 go build -trimpath -o pgsentinel ./cmd/pgsentinel
+
+  publish:
+    needs: [validate, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        name: Prepare image tags
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          STABLE: ${{ needs.validate.outputs.stable }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY}"
+          {
+            echo 'tags<<EOF'
+            echo "$image:$VERSION"
+            echo "$image:$TAG"
+            if [ "$STABLE" = true ]; then echo "$image:latest"; fi
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+      - name: Build and publish container
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          provenance: false
+          tags: ${{ steps.image.outputs.tags }}
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+      - name: Generate release notes
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          previous_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
+          ./scripts/release-notes.sh "$VERSION" "$previous_tag" > release-notes.md
+      - name: Create or repair GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          STABLE: ${{ needs.validate.outputs.stable }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "PGSentinel $TAG" --notes-file release-notes.md
+          elif [ "$STABLE" = true ]; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "PGSentinel $TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "PGSentinel $TAG" --notes-file release-notes.md --prerelease
+          fi

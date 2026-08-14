@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Test release automation
+        run: |
+          SKIP_REMOTE_CHECK=true ./scripts/validate-release.sh RELEASE
+          ./scripts/test-release.sh
+          ./scripts/test-release-notes.sh
+          ./scripts/test-github-workflows.sh
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Check formatting
+        run: test -z "$(find cmd internal migrations -name '*.go' -exec gofmt -l {} +)"
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -race -coverprofile=coverage.out ./...
+      - uses: actions/upload-artifact@v6
+        with:
+          name: backend-coverage
+          path: coverage.out
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run build
+
+  build:
+    needs: [backend, frontend, release-logic]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: CGO_ENABLED=0 go build -trimpath -o pgsentinel ./cmd/pgsentinel
+      - uses: actions/upload-artifact@v6
+        with:
+          name: pgsentinel-linux-amd64
+          path: pgsentinel
