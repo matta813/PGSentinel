@@ -1,0 +1,1 @@
+import{render,screen}from'@testing-library/react';import{describe,expect,it}from'vitest';import{SeverityBadge}from'./Status';describe('SeverityBadge',()=>{it('renders semantic severity',()=>{render(<SeverityBadge severity="CRITICAL"/>);expect(screen.getByText('CRITICAL')).toHaveClass('critical')})})
