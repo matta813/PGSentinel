@@ -62,8 +62,8 @@ frontend-lint:
 go-test:
   stage: test
   image: golang:1.26-alpine
-  before_script: ["apk add --no-cache git"]
-  script: ["go test -race -coverprofile=coverage.out ./..."]
+  before_script: ["apk add --no-cache git build-base"]
+  script: ["CGO_ENABLED=1 go test -race -coverprofile=coverage.out ./..."]
   coverage: '/total:.*\(statements\).*?([0-9.]+)%/'
   artifacts: {paths: [coverage.out], expire_in: 1 week}
 
