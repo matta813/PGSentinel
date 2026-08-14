@@ -1,0 +1,96 @@
+package collector
+
+import (
+	"context"
+	"gitlab.scruzzi.com/root/postgresqlui/internal/analyzer"
+	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	pg "gitlab.scruzzi.com/root/postgresqlui/internal/postgres"
+	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
+	"log/slog"
+	"sync"
+	"time"
+)
+
+type Manager struct {
+	store    *storage.Store
+	engine   *analyzer.Engine
+	log      *slog.Logger
+	interval time.Duration
+	wg       sync.WaitGroup
+}
+
+func NewManager(store *storage.Store, log *slog.Logger, interval time.Duration) *Manager {
+	return &Manager{store: store, engine: analyzer.New(analyzer.DefaultThresholds()), log: log, interval: interval}
+}
+func (m *Manager) Run(ctx context.Context) {
+	m.wg.Add(1)
+	defer m.wg.Done()
+	m.collectAll(ctx)
+	ticker := time.NewTicker(m.interval)
+	defer ticker.Stop()
+	prune := time.NewTicker(time.Hour)
+	defer prune.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.collectAll(ctx)
+		case <-prune.C:
+			_ = m.store.Prune(ctx, time.Now().Add(-30*24*time.Hour))
+		}
+	}
+}
+func (m *Manager) collectAll(ctx context.Context) {
+	servers, err := m.store.ListServers(ctx)
+	if err != nil {
+		m.log.Error("list monitoring targets", "error", err)
+		return
+	}
+	for _, s := range servers {
+		m.collect(ctx, s)
+	}
+}
+func (m *Manager) collect(ctx context.Context, s models.Server) {
+	target, err := m.store.GetServer(ctx, s.ID, true)
+	if err != nil {
+		return
+	}
+	client, err := pg.Connect(ctx, target)
+	if err != nil {
+		m.log.Warn("postgres collection failed", "server_id", s.ID, "error", err)
+		_ = m.store.UpdateServerStatus(ctx, s.ID, "unreachable", s.Version, err.Error(), false)
+		return
+	}
+	defer client.Close()
+	c := NewCore(client.Pool())
+	snap, err := c.Collect(ctx, s.ID)
+	if err != nil {
+		m.log.Warn("core collection failed", "server_id", s.ID, "error", err)
+		return
+	}
+	queries, pgss, qerr := c.CollectQueries(ctx)
+	snap.Capabilities["pg_stat_statements"] = pgss
+	if qerr == nil {
+		snap.Queries = queries
+		_ = m.store.SaveSnapshot(ctx, s.ID, "queries", queries, snap.CollectedAt)
+	}
+	locks, _ := c.CollectLocks(ctx)
+	snap.Locks = locks
+	_ = m.store.SaveSnapshot(ctx, s.ID, "locks", locks, snap.CollectedAt)
+	tables, _ := c.CollectTables(ctx, "postgres")
+	snap.Tables = tables
+	_ = m.store.SaveSnapshot(ctx, s.ID, "tables", tables, snap.CollectedAt)
+	indexes, _ := c.CollectIndexes(ctx)
+	snap.Indexes = indexes
+	_ = m.store.SaveSnapshot(ctx, s.ID, "indexes", indexes, snap.CollectedAt)
+	settings, _ := c.CollectConfiguration(ctx)
+	snap.Settings = settings
+	_ = m.store.SaveSnapshot(ctx, s.ID, "configuration", settings, snap.CollectedAt)
+	_ = m.store.SaveSnapshot(ctx, s.ID, "core", snap, snap.CollectedAt)
+	findings := m.engine.Analyze(snap)
+	findings = append(findings, analyzer.IndexFindings(s.ID, indexes)...)
+	_ = m.store.UpsertFindings(ctx, s.ID, findings)
+	_ = m.store.UpdateServerStatus(ctx, s.ID, "healthy", snap.Version, "", true)
+	m.log.Info("monitoring cycle complete", "server_id", s.ID, "findings", len(findings))
+}
