@@ -131,7 +131,7 @@ publish-release:
     - PREVIOUS_TAG="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
     - ./scripts/release-notes.sh "$RELEASE_VERSION" "$PREVIOUS_TAG" > release-notes.md
     - BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    - docker build --build-arg VERSION="$RELEASE_VERSION" --build-arg COMMIT_SHA="$CI_COMMIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" -t "$CI_REGISTRY_IMAGE:$RELEASE_VERSION" .
+    - docker build --provenance=false --build-arg VERSION="$RELEASE_VERSION" --build-arg COMMIT_SHA="$CI_COMMIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" -t "$CI_REGISTRY_IMAGE:$RELEASE_VERSION" .
     - docker tag "$CI_REGISTRY_IMAGE:$RELEASE_VERSION" "$CI_REGISTRY_IMAGE:$RELEASE_TAG"
     - docker push "$CI_REGISTRY_IMAGE:$RELEASE_VERSION"
     - docker push "$CI_REGISTRY_IMAGE:$RELEASE_TAG"

@@ -39,6 +39,7 @@ Recommended settings: protect `main`, protect `v*` tags while allowing release a
 - **Version went backwards:** choose a version greater than the newest release under SemVer precedence.
 - **Tag exists:** never reuse versions. For a partial publication, verify the tag target before repairing the release record.
 - **Registry denied:** verify Registry enablement and standard CI registry variables.
+- **Registry reports `blob unknown`:** the release build disables BuildKit's optional provenance manifest for compatibility with older self-hosted registries.
 - **Release API 404:** enable job-token Releases API access or add protected `GITLAB_TOKEN`.
 - **No release jobs:** ensure this is a direct push to `main` and `RELEASE` actually changed.
 - **Retry after infrastructure failure:** run a new pipeline on `main` with `RETRY_RELEASE=true`, either in GitLab or with `glab ci run -b main --variables RETRY_RELEASE:true`. This uses the current CI definition, revalidates the version/tag, and safely republishes image tags before creating the GitLab Release. Do not retry an old job when its CI configuration itself was faulty.
