@@ -1,6 +1,6 @@
 package analyzer
 
-import "gitlab.scruzzi.com/root/postgresqlui/internal/models"
+import "github.com/matta813/pgsentinel/internal/models"
 
 type Score struct {
 	Overall    int            `json:"overall"`

@@ -3,8 +3,8 @@ package api
 import (
 	"database/sql"
 	"github.com/google/uuid"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
-	pg "gitlab.scruzzi.com/root/postgresqlui/internal/postgres"
+	"github.com/matta813/pgsentinel/internal/models"
+	pg "github.com/matta813/pgsentinel/internal/postgres"
 	"net/http"
 	"strings"
 )

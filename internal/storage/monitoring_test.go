@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"github.com/matta813/pgsentinel/internal/models"
 	"path/filepath"
 	"testing"
 	"time"

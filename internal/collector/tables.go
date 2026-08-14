@@ -3,7 +3,7 @@ package collector
 import (
 	"context"
 	"fmt"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"github.com/matta813/pgsentinel/internal/models"
 )
 
 func (c *Core) CollectTables(ctx context.Context, database string) ([]models.TableStat, error) {

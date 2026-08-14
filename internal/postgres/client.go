@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
+	"github.com/matta813/pgsentinel/internal/models"
 )
 
 type Client struct{ pool *pgxpool.Pool }

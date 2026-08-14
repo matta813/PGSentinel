@@ -1,7 +1,7 @@
 package api
 
 import (
-	"gitlab.scruzzi.com/root/postgresqlui/internal/notifications"
+	"github.com/matta813/pgsentinel/internal/notifications"
 	"net/http"
 )
 

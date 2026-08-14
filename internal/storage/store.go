@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.scruzzi.com/root/postgresqlui/internal/models"
-	"gitlab.scruzzi.com/root/postgresqlui/migrations"
+	"github.com/matta813/pgsentinel/internal/models"
+	"github.com/matta813/pgsentinel/migrations"
 	_ "modernc.org/sqlite"
 )
 
