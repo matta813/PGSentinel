@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -63,5 +64,49 @@ func TestRejectsUnknownFields(t *testing.T) {
 	h.ServeHTTP(r, httptest.NewRequest("POST", "/api/v1/servers", strings.NewReader(`{"name":"x","unexpected":true}`)))
 	if r.Code != 400 {
 		t.Fatalf("got %d", r.Code)
+	}
+}
+
+func TestFrontendDoesNotServeFilesOutsideRoot(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "web")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("frontend-index"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "asset.txt"), []byte("public-asset"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "secret.txt"), []byte("must-not-leak"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := storage.Open(filepath.Join(t.TempDir(), "frontend.db"), "a sufficiently long frontend test key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	app := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	app.ServeFrontend(root)
+
+	for _, requestPath := range []string{"/../secret.txt", "/%2e%2e/secret.txt"} {
+		r := httptest.NewRecorder()
+		app.Handler().ServeHTTP(r, httptest.NewRequest(http.MethodGet, requestPath, nil))
+		if strings.Contains(r.Body.String(), "must-not-leak") {
+			t.Fatalf("path %q exposed a file outside the frontend root", requestPath)
+		}
+	}
+
+	r := httptest.NewRecorder()
+	app.Handler().ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/asset.txt", nil))
+	if r.Code != http.StatusOK || r.Body.String() != "public-asset" {
+		t.Fatalf("asset response=%d %q", r.Code, r.Body.String())
+	}
+	r = httptest.NewRecorder()
+	app.Handler().ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/client-side-route", nil))
+	if r.Code != http.StatusOK || r.Body.String() != "frontend-index" {
+		t.Fatalf("fallback response=%d %q", r.Code, r.Body.String())
 	}
 }

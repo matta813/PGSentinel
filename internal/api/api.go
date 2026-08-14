@@ -6,10 +6,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/matta813/pgsentinel/internal/buildinfo"
 	"github.com/matta813/pgsentinel/internal/storage"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 )
 
@@ -43,13 +44,24 @@ func (a *API) routes() {
 }
 
 func (a *API) ServeFrontend(directory string) {
+	frontend := os.DirFS(directory)
+	files := http.FileServerFS(frontend)
+	index, indexErr := fs.ReadFile(frontend, "index.html")
 	a.mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Join(directory, filepath.Clean(r.URL.Path))
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			http.ServeFile(w, r, path)
+		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		if name != "" && fs.ValidPath(name) {
+			if info, err := fs.Stat(frontend, name); err == nil && !info.IsDir() {
+				files.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		if indexErr == nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(index)
 			return
 		}
-		http.ServeFile(w, r, filepath.Join(directory, "index.html"))
+		http.NotFound(w, r)
 	})
 }
 func write(w http.ResponseWriter, status int, value any) {
