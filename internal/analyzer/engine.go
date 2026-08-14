@@ -40,6 +40,9 @@ func (e *Engine) Analyze(s models.Snapshot) []models.Finding {
 		add(newFinding("blocking-queries", s.ServerID, "", "", models.SeverityHigh, "Locks", "Queries are blocked by other sessions", fmt.Sprintf("%d blocked sessions detected; longest wait %.0f seconds.", len(s.Locks), max), "Blocked work can increase application latency and cause cascading connection pressure.", models.ConfidenceHigh, []models.Evidence{{Label: "Affected sessions", Value: fmt.Sprint(len(s.Locks))}, {Label: "Longest wait", Value: fmt.Sprintf("%.0f seconds", max)}}))
 	}
 	for _, d := range s.Databases {
+		if d.Deadlocks > 0 {
+			add(newFinding("deadlocks", s.ServerID, d.Name, "", models.SeverityHigh, "Locks", "Deadlocks were detected", fmt.Sprintf("PostgreSQL recorded %.0f deadlocks since statistics reset.", d.Deadlocks), "Deadlocks abort transactions and can surface as application errors. Compare counter deltas to determine whether this is current.", models.ConfidenceMedium, []models.Evidence{{Label: "Deadlocks", Value: fmt.Sprintf("%.0f", d.Deadlocks)}}))
+		}
 		total := d.Commits + d.Rollbacks
 		if total > 100 && d.Rollbacks/total*100 >= t.RollbackRatio {
 			add(newFinding("rollback-ratio", s.ServerID, d.Name, "", models.SeverityMedium, "Transactions", "Rollback ratio is elevated", fmt.Sprintf("%.1f%% of transactions rolled back.", d.Rollbacks/total*100), "Frequent rollbacks waste database work and may indicate application errors or contention.", models.ConfidenceMedium, nil))
@@ -63,6 +66,14 @@ func (e *Engine) Analyze(s models.Snapshot) []models.Finding {
 		}
 		if table.EstimatedRows > 1e6 && table.SeqScans > 1000 && table.IndexScans < table.SeqScans/10 {
 			add(newFinding("large-seq-scans", s.ServerID, table.Database, resource, models.SeverityLow, "Queries", "Large table receives many sequential scans", fmt.Sprintf("%.0f sequential scans were observed on approximately %.0f rows.", table.SeqScans, table.EstimatedRows), "This is a potential improvement only; sequential scans can be optimal. Correlate with frequent costly query filters and existing indexes.", models.ConfidenceLow, nil))
+		}
+		if table.EstimatedRows > 100000 && stale(table.LastAutoanalyze, 7*24*time.Hour) && stale(table.LastAnalyze, 7*24*time.Hour) {
+			add(newFinding("stale-analyze", s.ServerID, table.Database, resource, models.SeverityMedium, "Queries", "Table statistics may be stale", fmt.Sprintf("%s has not been analyzed in the last 7 days.", resource), "Stale planner statistics can lead to poor row estimates and inefficient plans.", models.ConfidenceMedium, nil))
+		}
+	}
+	for _, q := range s.Queries {
+		if q.ImpactScore >= t.QueryImpactHigh {
+			add(newFinding("query-impact", s.ServerID, q.Database, q.QueryID, models.SeverityMedium, "Queries", "Query has unusually high total impact", fmt.Sprintf("Query %s has an impact score of %.1f from total runtime, latency, reads, temp I/O and WAL.", q.QueryID, q.ImpactScore), "A high cumulative workload can consume substantial database capacity even when individual executions appear fast.", models.ConfidenceMedium, []models.Evidence{{Label: "Calls", Value: fmt.Sprintf("%.0f", q.Calls)}, {Label: "Total runtime", Value: fmt.Sprintf("%.0f ms", q.TotalExecMS)}, {Label: "Mean latency", Value: fmt.Sprintf("%.2f ms", q.MeanExecMS)}}))
 		}
 	}
 	if !s.Capabilities["pg_stat_statements"] {
