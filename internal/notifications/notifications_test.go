@@ -17,7 +17,7 @@ func TestWebhook(t *testing.T) {
 		w.WriteHeader(204)
 	}))
 	defer s.Close()
-	p, err := NewWebhook(s.URL, nil)
+	p, err := NewWebhook(s.URL, nil, NewTargetPolicy(true, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,6 +26,27 @@ func TestWebhook(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("not called")
+	}
+}
+
+func TestBlocksPrivateTargetsByDefault(t *testing.T) {
+	if _, err := NewWebhook("http://127.0.0.1:8080/hook", nil); err == nil {
+		t.Fatal("expected loopback target rejection")
+	}
+	if _, err := NewWebhook("http://169.254.169.254/latest/meta-data", nil); err == nil {
+		t.Fatal("expected link-local metadata target rejection")
+	}
+}
+
+func TestExplicitHostAllowlistPermitsPrivateTarget(t *testing.T) {
+	if _, err := NewWebhook("http://127.0.0.1:8080/hook", nil, NewTargetPolicy(false, []string{"127.0.0.1"})); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRejectsCredentialsInTargetURL(t *testing.T) {
+	if _, err := NewWebhook("https://user:secret@example.com/hook", nil); err == nil {
+		t.Fatal("expected URL credentials rejection")
 	}
 }
 func TestRejectsInvalidURL(t *testing.T) {
