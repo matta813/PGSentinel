@@ -24,13 +24,13 @@ func (a *API) testNotification(w http.ResponseWriter, r *http.Request) {
 	var p notifications.Provider
 	switch v.Provider {
 	case "ntfy":
-		n := notifications.NewNtfy(v.ServerURL, v.Topic)
+		n := notifications.NewNtfy(v.ServerURL, v.Topic, a.notificationPolicy)
 		n.Token = v.Token
 		n.Username = v.Username
 		n.Password = v.Password
 		p = n
 	case "webhook":
-		hook, err := notifications.NewWebhook(v.WebhookURL, nil)
+		hook, err := notifications.NewWebhook(v.WebhookURL, nil, a.notificationPolicy)
 		if err != nil {
 			failure(w, 422, "Invalid webhook configuration", err)
 			return

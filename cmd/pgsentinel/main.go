@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/matta813/pgsentinel/internal/api"
+	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/buildinfo"
 	"github.com/matta813/pgsentinel/internal/collector"
 	"github.com/matta813/pgsentinel/internal/config"
+	"github.com/matta813/pgsentinel/internal/notifications"
 	"github.com/matta813/pgsentinel/internal/storage"
 )
 
@@ -37,7 +39,11 @@ func main() {
 	defer stop()
 	manager := collector.NewManager(store, log, cfg.StatsInterval)
 	go manager.Run(ctx)
-	app := api.New(store, log)
+	authentication := auth.New(auth.Config{Password: cfg.AdminPassword, SecureCookies: cfg.SecureCookies})
+	app := api.New(store, log, api.Options{
+		Auth:               authentication,
+		NotificationPolicy: notifications.NewTargetPolicy(cfg.AllowPrivateNotificationTargets, cfg.NotificationAllowedHosts),
+	})
 	app.ServeFrontend(cfg.FrontendDir)
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
