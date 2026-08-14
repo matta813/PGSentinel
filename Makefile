@@ -1,7 +1,7 @@
 .PHONY: dev backend frontend test lint build docker-build docker-up
 
 dev:
-	docker compose up --build
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 backend:
 	go run ./cmd/pgsentinel
@@ -27,5 +27,4 @@ docker-build:
 	docker build -t pgsentinel:local .
 
 docker-up:
-	docker compose up -d --build
-
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build

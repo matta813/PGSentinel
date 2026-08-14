@@ -7,11 +7,15 @@
 Create a release by changing the value and pushing the commit to `main`:
 
 ```bash
+git switch -c release/0.4.2
 printf '0.4.2\n' > RELEASE
 git add RELEASE
 git commit -m 'chore: release 0.4.2'
-git push origin main
+git push -u origin release/0.4.2
+gh pr create --base main --fill
 ```
+
+Because `main` is protected, submit the version bump through a pull request. Merging that reviewed PR produces the direct `main` event consumed by the release workflow. It is valid—and preferred—to include version-specific Compose and documentation updates in the same release PR.
 
 ## Pipeline behavior
 

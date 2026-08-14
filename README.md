@@ -21,7 +21,8 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 
 ```bash
 export PGSENTINEL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
-docker compose up --build
+docker compose pull
+docker compose up -d
 ```
 
 Open <http://localhost:8080>, then add an existing PostgreSQL server under **Servers**. The Compose stack starts only PGSentinel and does not provision or modify a PostgreSQL instance.
@@ -42,6 +43,14 @@ services:
 ```
 
 The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity. Keep the encryption key stable—losing it makes stored credentials unrecoverable.
+
+The repository Compose file defaults to the pinned `0.1.0` image. Set `PGSENTINEL_VERSION` to choose another release. Local source builds use the explicit development override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+See the [deployment guide](docs/deployment.md) for upgrades, persistence, backup/restore, health checks and production hardening.
 
 ## PostgreSQL setup
 
@@ -76,18 +85,20 @@ Passwords, tokens, and full connection URLs are never logged or returned by norm
 [`RELEASE`](RELEASE) is the single source of truth. To publish, change its sole line to a greater Semantic Version and push that commit to `main`:
 
 ```bash
-printf '0.3.0\n' > RELEASE
+git switch -c release/0.2.0
+printf '0.2.0\n' > RELEASE
 git add RELEASE
-git commit -m "chore: release 0.3.0"
-git push origin main
+git commit -m "chore: release 0.2.0"
+git push -u origin release/0.2.0
+gh pr create --base main --fill
 ```
 
-After lint, tests and builds pass, GitHub Actions exclusively for that version change publishes `:0.3.0`, `:v0.3.0`, and—for stable versions—`:latest` to GHCR. It then creates Git tag and GitHub Release `v0.3.0` with grouped Conventional Commit notes. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal commits, pull requests, branches and tag events do not build a container.
+After lint, tests and builds pass, GitHub Actions exclusively for that version change publishes `:0.2.0`, `:v0.2.0`, and—for stable versions—`:latest` to GHCR. It then creates Git tag and GitHub Release `v0.2.0` with grouped Conventional Commit notes. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal commits, pull requests, branches and tag events do not build a container.
 
 Pin production deployments to a version:
 
 ```bash
-docker pull ghcr.io/matta813/pgsentinel:0.3.0
+docker pull ghcr.io/matta813/pgsentinel:0.1.0
 ```
 
 `latest` is convenient for evaluation but moves on every stable release. See [release workflow, permissions, and troubleshooting](docs/releases.md).
