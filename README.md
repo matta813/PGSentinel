@@ -120,3 +120,7 @@ Versioned endpoints live under `/api/v1`: servers and connection tests, overview
 - EXPLAIN architecture is reserved. pgsentinel never runs `EXPLAIN ANALYZE` automatically.
 
 Contributions are welcome. Please run `make test lint` and keep recommendations cautious and evidence-backed. Licensed under [MIT](LICENSE).
+
+## Dependency updates
+
+Renovate monitors Go, npm, Docker/Compose and GitLab CI dependencies through merge requests. Patch updates can merge only after the complete protected GitLab CI succeeds; minor updates require review and major updates require Dependency Dashboard approval. Product releases remain separate: Renovate explicitly ignores `RELEASE` and cannot trigger release image publication. Operational details are in the [development guide](docs/development.md#dependency-updates).
