@@ -16,7 +16,7 @@ Use Conventional Commits. Keep generated output, databases, `.env` and credentia
 
 ## Dependency updates
 
-Dependencies are monitored by the self-hosted Renovate runner in `root/renovate-runner`. Renovate reads [`renovate.json`](../renovate.json), updates Go modules and checksums, npm manifests and `package-lock.json`, Dockerfile/Compose images, and GitLab CI images through `renovate/*` merge requests.
+Dependencies are monitored by a scheduled self-hosted Renovate job in this project's GitLab pipeline. The separate `root/renovate-runner` repository remains a reusable central-runner template, but the active schedule is colocated because the least-privilege Project Access Token is intentionally scoped to PGSentinel. Renovate reads [`renovate.json`](../renovate.json), updates Go modules and checksums, npm manifests and `package-lock.json`, Dockerfile/Compose images, and GitLab CI images through `renovate/*` merge requests.
 
 - Patch, digest, and pin updates may use GitLab platform automerge only after every required pipeline and branch-protection condition succeeds.
 - Minor updates always wait for human review.

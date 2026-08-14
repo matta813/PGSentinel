@@ -4,7 +4,7 @@ workflow:
       when: never
     - when: always
 
-stages: [validate, lint, test, build, release]
+stages: [validate, lint, test, build, renovate, release]
 
 default:
   interruptible: true
@@ -81,6 +81,25 @@ build:
     - npm --prefix frontend run build
     - CGO_ENABLED=0 go build -trimpath -o pgsentinel ./cmd/pgsentinel
   artifacts: {paths: [pgsentinel, frontend/dist/], expire_in: 1 week}
+
+renovate:
+  stage: renovate
+  image: renovate/renovate:44.2.1
+  resource_group: renovate
+  interruptible: false
+  variables:
+    RENOVATE_PLATFORM: "gitlab"
+    RENOVATE_ENDPOINT: "https://gitlab.scruzzi.com/api/v4/"
+    RENOVATE_ONBOARDING: "false"
+    RENOVATE_REQUIRE_CONFIG: "required"
+    RENOVATE_REPOSITORIES: "root/postgresqlui"
+    LOG_LEVEL: "info"
+  script:
+    - renovate
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $RUN_RENOVATE == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "web" && $RUN_RENOVATE == "true"'
+    - when: never
 
 publish-release:
   stage: release
