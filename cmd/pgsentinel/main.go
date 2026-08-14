@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"gitlab.scruzzi.com/root/postgresqlui/internal/api"
+	"gitlab.scruzzi.com/root/postgresqlui/internal/buildinfo"
 	"gitlab.scruzzi.com/root/postgresqlui/internal/collector"
 	"gitlab.scruzzi.com/root/postgresqlui/internal/config"
 	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
 )
-
-var version = "dev"
 
 func main() {
 	cfg, err := config.Load()
@@ -27,7 +26,7 @@ func main() {
 	if cfg.LogLevel == "debug" {
 		level = slog.LevelDebug
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})).With("service", "pgsentinel", "version", version)
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})).With("service", "pgsentinel", "version", buildinfo.Version, "commit", buildinfo.CommitSHA)
 	store, err := storage.Open(cfg.DatabasePath, cfg.EncryptionKey)
 	if err != nil {
 		log.Error("open storage", "error", err)

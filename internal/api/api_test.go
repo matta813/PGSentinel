@@ -48,6 +48,15 @@ func TestHealthAndServerAPI(t *testing.T) {
 		t.Fatalf("list=%d %s", r.Code, r.Body.String())
 	}
 }
+
+func TestVersionAPI(t *testing.T) {
+	h := testAPI(t)
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest("GET", "/api/v1/version", nil))
+	if r.Code != 200 || !strings.Contains(r.Body.String(), `"version":"dev"`) || !strings.Contains(r.Body.String(), `"commit":"unknown"`) {
+		t.Fatalf("version=%d %s", r.Code, r.Body.String())
+	}
+}
 func TestRejectsUnknownFields(t *testing.T) {
 	h := testAPI(t)
 	r := httptest.NewRecorder()

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
+	"gitlab.scruzzi.com/root/postgresqlui/internal/buildinfo"
 	"gitlab.scruzzi.com/root/postgresqlui/internal/storage"
 	"log/slog"
 	"net/http"
@@ -29,6 +30,7 @@ func (a *API) routes() {
 		write(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	a.mux.HandleFunc("GET /ready", a.ready)
+	a.mux.HandleFunc("GET /api/v1/version", func(w http.ResponseWriter, _ *http.Request) { write(w, http.StatusOK, buildinfo.Current()) })
 	a.mux.HandleFunc("GET /api/v1/servers", a.listServers)
 	a.mux.HandleFunc("POST /api/v1/servers", a.createServer)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}", a.getServer)
