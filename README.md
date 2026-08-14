@@ -1,4 +1,10 @@
-# pgsentinel
+# PGSentinel
+
+[![CI](https://github.com/matta813/pgsentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/matta813/pgsentinel/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/matta813/pgsentinel/actions/workflows/codeql.yml/badge.svg)](https://github.com/matta813/pgsentinel/actions/workflows/codeql.yml)
+[![GitHub release](https://img.shields.io/github/v/release/matta813/pgsentinel)](https://github.com/matta813/pgsentinel/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/matta813/pgsentinel/badge)](https://scorecard.dev/viewer/?uri=github.com/matta813/pgsentinel)
 
 PostgreSQL monitoring and health analysis that explains **what is wrong, why it matters, the evidence behind it, and what to investigate next**. pgsentinel is deliberately an operations inbox rather than a wall of graphs.
 
@@ -115,7 +121,7 @@ make lint
 make build
 ```
 
-See [architecture](docs/architecture.md), [health rules](docs/health-rules.md), and [development guide](docs/development.md).
+See the [documentation index](docs/README.md), [architecture](docs/architecture.md), [health rules](docs/health-rules.md), and [development guide](docs/development.md).
 
 ## API
 
@@ -130,7 +136,13 @@ Versioned endpoints live under `/api/v1`: servers and connection tests, overview
 - OS/disk metrics are intentionally absent without a reliable agent or exporter.
 - EXPLAIN architecture is reserved. pgsentinel never runs `EXPLAIN ANALYZE` automatically.
 
-Contributions are welcome. Please run `make test lint` and keep recommendations cautious and evidence-backed. Licensed under [MIT](LICENSE).
+The maintained roadmap and contribution priorities are in [ROADMAP.md](ROADMAP.md).
+
+## Community
+
+Contributions are welcome. Read the [contribution guide](CONTRIBUTING.md), use [GitHub Discussions](https://github.com/matta813/pgsentinel/discussions) for support, and report vulnerabilities according to the [security policy](SECURITY.md). Project participation follows the [Code of Conduct](CODE_OF_CONDUCT.md) and [governance model](GOVERNANCE.md).
+
+PGSentinel is licensed under the [MIT License](LICENSE).
 
 ## Dependency updates
 

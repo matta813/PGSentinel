@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.go text diff=golang
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary

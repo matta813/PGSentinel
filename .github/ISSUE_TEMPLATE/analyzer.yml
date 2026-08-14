@@ -1,0 +1,35 @@
+name: Analyzer finding feedback
+description: Report a false positive, false negative, or unclear recommendation
+title: "analyzer: "
+labels: ["area: analyzer", "status: needs triage"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Feedback type
+      options:
+        - False positive
+        - False negative
+        - Severity or confidence seems wrong
+        - Evidence or guidance is unclear
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Rule or finding ID
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence and workload context
+      description: Include relevant metrics and timing, never credentials or sensitive query literals.
+    validations:
+      required: true
+  - type: textarea
+    id: expectation
+    attributes:
+      label: Expected assessment
+    validations:
+      required: true
