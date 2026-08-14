@@ -23,7 +23,6 @@
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["dependencies", "renovate", "security"],
-    "prPriority": 10,
     "minimumReleaseAge": null
   },
   "packageRules": [
