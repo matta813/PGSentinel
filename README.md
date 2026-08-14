@@ -1,93 +1,101 @@
-# postgresqlui
+# pgsentinel
 
+PostgreSQL monitoring and health analysis that explains **what is wrong, why it matters, the evidence behind it, and what to investigate next**. pgsentinel is deliberately an operations inbox rather than a wall of graphs.
 
+> Early usable release. PostgreSQL 15+ is the primary target. Never apply a recommendation to production without validating it against the workload and recovery plan.
 
-## Getting started
+## Features
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+- Multiple PostgreSQL servers, encrypted credentials, SSL modes and connection diagnostics
+- Connections, transactions, databases, locks, tables, vacuum, indexes and configuration collection
+- `pg_stat_statements` query load with a documented multi-factor Query Impact Score
+- Stable problem fingerprints with active, resolved and reopened lifecycle
+- Evidence-driven rules, confidence, weighted server health and category scores
+- Duplicate/unused index candidates; no automatic destructive database changes
+- ntfy and generic webhook delivery tests
+- Responsive professional light/dark React interface
+- SQLite WAL storage, migrations and 30-day raw snapshot retention
+- One production container, health/readiness endpoints and GitLab CI
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Quick start
 
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```bash
+export PGSENTINEL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+docker compose up --build
 ```
-cd existing_repo
-git remote add origin https://gitlab.scruzzi.com/root/postgresqlui.git
-git branch -M main
-git push -uf origin main
+
+Open <http://localhost:8080>. The compose stack also starts PostgreSQL 18 with `pg_stat_statements` and a demo monitoring role. Add it in **Servers** using host `postgres-test`, port `5432`, user `pgsentinel`, password `pgsentinel-demo-only`, and SSL mode `disable`.
+
+Minimal deployment:
+
+```yaml
+services:
+  pgsentinel:
+    image: registry.gitlab.scruzzi.com/root/postgresqlui:latest
+    container_name: pgsentinel
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    volumes: ["./data:/data"]
+    environment:
+      TZ: Europe/Zurich
+      PGSENTINEL_ENCRYPTION_KEY: "replace-with-a-long-random-secret"
 ```
 
-## Integrate with your tools
+The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity. Keep the encryption key stable—losing it makes stored credentials unrecoverable.
 
-* [Set up project integrations](https://gitlab.scruzzi.com/root/postgresqlui/-/settings/integrations)
+## PostgreSQL setup
 
-## Collaborate with your team
+```sql
+CREATE ROLE pgsentinel LOGIN PASSWORD 'use-a-strong-secret';
+GRANT pg_monitor TO pgsentinel;
+```
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Allow the source address in `pg_hba.conf`, prefer verified TLS across networks, and see [monitoring user guidance](docs/monitoring-user.md). Query monitoring additionally needs:
 
-## Test and Deploy
+```conf
+shared_preload_libraries = 'pg_stat_statements'
+```
 
-Use the built-in continuous integration in GitLab.
+After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and explained in the UI.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+## Configuration
 
-***
+| Variable | Default | Meaning |
+|---|---:|---|
+| `PGSENTINEL_ENCRYPTION_KEY` | required | Master secret used for AES-GCM credential encryption |
+| `PGSENTINEL_LISTEN_ADDR` | `:8080` | HTTP listen address |
+| `PGSENTINEL_DATA_DIR` | `/data` | SQLite data directory |
+| `PGSENTINEL_STATS_INTERVAL` | `30s` | Monitoring cycle interval |
+| `PGSENTINEL_RETENTION` | `720h` | Configured retention horizon |
+| `PGSENTINEL_LOG_LEVEL` | `info` | `info` or `debug` structured JSON logging |
 
-# Editing this README
+Passwords, tokens, and full connection URLs are never logged or returned by normal APIs. Normalized `pg_stat_statements.query` text can still contain literals for statements that PostgreSQL cannot normalize; treat database access as sensitive.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Development
 
-## Suggestions for a good README
+Requires Go 1.26, Node 24+, npm and optionally Docker.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```bash
+npm ci --prefix frontend
+export PGSENTINEL_ENCRYPTION_KEY=development-only-change-this-key
+make test
+make lint
+make build
+```
 
-## Name
-Choose a self-explaining name for your project.
+See [architecture](docs/architecture.md), [health rules](docs/health-rules.md), and [development guide](docs/development.md).
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## API
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. `GET /health` is a liveness probe; `GET /ready` verifies SQLite.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## Roadmap and limitations
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+- Current collection opens a small pool per cycle and deeply inspects the connection database (`postgres`); per-database fan-out is the next collector milestone.
+- Raw snapshots have simple retention; tiered downsampling and long-term aggregation are planned.
+- Baseline primitives exist, while continuous per-query 24-hour regression evaluation and causal timeline correlation remain planned.
+- Alert provider delivery tests work; persisted alert-routing rules and automatic dispatch remain planned.
+- OS/disk metrics are intentionally absent without a reliable agent or exporter.
+- EXPLAIN architecture is reserved. pgsentinel never runs `EXPLAIN ANALYZE` automatically.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Contributions are welcome. Please run `make test lint` and keep recommendations cautious and evidence-backed. Licensed under [MIT](LICENSE).
