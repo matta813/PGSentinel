@@ -1,0 +1,14 @@
+.env
+.env.local
+data/
+*.db
+*.db-shm
+*.db-wal
+bin/
+coverage/
+frontend/node_modules/
+frontend/dist/
+.idea/
+.vscode/
+.DS_Store
+
