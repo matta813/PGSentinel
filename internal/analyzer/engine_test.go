@@ -6,7 +6,7 @@ import (
 )
 
 func TestConnectionAndVacuumRules(t *testing.T) {
-	s := models.Snapshot{ServerID: "s", Connections: models.ConnectionStats{Total: 96, Max: 100, Utilization: 96}, Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}, Tables: []models.TableStat{{Database: "db", Schema: "public", Table: "events", LiveTuples: 700, DeadTuples: 300, VacuumThreshold: 200, VacuumProgress: 150}}}
+	s := models.Snapshot{ServerID: "s", Connections: models.ConnectionStats{Total: 96, Max: 100, Utilization: 96}, Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}, Tables: []models.TableStat{{Database: "db", Schema: "public", Table: "events", LiveTuples: 70000, DeadTuples: 30000, VacuumThreshold: 20000, VacuumProgress: 150}}}
 	got := New(DefaultThresholds()).Analyze(s)
 	if len(got) != 3 {
 		t.Fatalf("expected 3 findings, got %d", len(got))
