@@ -27,7 +27,7 @@ if [ -n "$previous" ]; then
   fi
 fi
 
-if [ -n "${CI_REPOSITORY_URL:-}" ] && git ls-remote --exit-code "$CI_REPOSITORY_URL" "refs/tags/$tag" >/dev/null 2>&1; then
+if [ "${SKIP_REMOTE_CHECK:-false}" != "true" ] && [ -n "${CI_REPOSITORY_URL:-}" ] && git ls-remote --exit-code "$CI_REPOSITORY_URL" "refs/tags/$tag" >/dev/null 2>&1; then
   echo "Tag $tag already exists; refusing a duplicate release" >&2
   exit 1
 fi

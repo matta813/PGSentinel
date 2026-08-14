@@ -25,8 +25,6 @@ release-validation:
     - git fetch --tags --force
     - PREVIOUS_TAG="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
     - PREVIOUS_VERSION="${PREVIOUS_TAG#v}" ./scripts/validate-release.sh RELEASE
-    - ./scripts/test-release.sh
-    - ./scripts/test-release-notes.sh
   artifacts:
     reports: {dotenv: release.env}
     expire_in: 1 day
@@ -34,6 +32,16 @@ release-validation:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       changes: [RELEASE]
     - when: never
+
+release-logic-test:
+  stage: validate
+  image: alpine:3.23
+  before_script: ["apk add --no-cache git"]
+  script:
+    - SKIP_REMOTE_CHECK=true ./scripts/validate-release.sh RELEASE
+    - ./scripts/test-release.sh
+    - ./scripts/test-release-notes.sh
+    - ./scripts/test-ci-release-rules.sh
 
 go-lint:
   stage: lint
