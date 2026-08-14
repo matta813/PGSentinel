@@ -1,0 +1,60 @@
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+      time: "04:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 5
+    labels: [dependencies, go]
+    groups:
+      go-patches:
+        patterns: ["*"]
+        update-types: [patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: daily
+      time: "04:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    labels: [dependencies, frontend]
+    groups:
+      frontend-runtime-patches:
+        dependency-type: production
+        patterns: ["*"]
+        update-types: [patch]
+      frontend-development-patches:
+        dependency-type: development
+        patterns: ["*"]
+        update-types: [patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: daily
+      time: "04:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
+    groups:
+      docker-patches:
+        patterns: ["*"]
+        update-types: [patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+      time: "04:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 5
+    labels: [dependencies, ci]
+    groups:
+      github-actions-patches:
+        patterns: ["*"]
+        update-types: [patch]
