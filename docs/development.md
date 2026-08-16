@@ -13,6 +13,10 @@ In another terminal, `make frontend`; Vite proxies API requests to port 8080. `m
 
 Add migrations as ordered files under `migrations/`. Rules should be deterministic, return actionable evidence, state uncertainty, and include unit tests at threshold boundaries. Collector queries must be read-only, bounded, version-aware for PostgreSQL 15+, and avoid large unbounded result sets. Never log a server object containing its decrypted password.
 
+## Collector schedules
+
+Collector work is split across four independently configurable schedules. `PGSENTINEL_FAST_INTERVAL` refreshes connections and locks, `PGSENTINEL_STATS_INTERVAL` refreshes core statistics and query data, `PGSENTINEL_SLOW_INTERVAL` refreshes tables and indexes, and `PGSENTINEL_META_INTERVAL` refreshes server configuration. Startup performs one complete cycle so every resource is immediately populated; partial cycles reuse the latest snapshots when running the analyzer.
+
 Use Conventional Commits for commits and pull-request titles. Release notes use the pull-request title to select their category, retain the PR author and link, and let GitHub identify first-time contributors. Apply `skip-changelog` before merge only when a pull request should be absent from public release notes. Keep generated output, databases, `.env` and credentials out of Git. Validate with `git diff --check` before pushing.
 
 Merge completed, independently releasable pull requests into protected `main`; do not change `RELEASE` in normal feature, fix, documentation, or dependency work. `main` accumulates the next release while remaining buildable. Large incomplete work should stay in a pull request or behind a safe, disabled-by-default feature flag. A dedicated release pull request updates `RELEASE`, Compose pins, and version-specific documentation when the accumulated changes are ready to publish. See the [release workflow](releases.md).
