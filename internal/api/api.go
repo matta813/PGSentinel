@@ -44,6 +44,7 @@ func (a *API) routes() {
 		write(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	a.mux.HandleFunc("GET /ready", a.ready)
+	a.mux.HandleFunc("GET /metrics", a.prometheusMetrics)
 	a.mux.HandleFunc("GET /api/v1/version", func(w http.ResponseWriter, _ *http.Request) { write(w, http.StatusOK, buildinfo.Current()) })
 	a.mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	a.mux.HandleFunc("GET /api/v1/auth/session", a.session)

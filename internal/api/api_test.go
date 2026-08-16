@@ -120,6 +120,32 @@ func TestVersionAPI(t *testing.T) {
 		t.Fatalf("version=%d %s", r.Code, r.Body.String())
 	}
 }
+
+func TestPrometheusMetricsExposeOnlyAggregateState(t *testing.T) {
+	h := testAPI(t)
+	server := `{"name":"secret-production-name","host":"private.internal","user":"monitor","password":"super-secret"}`
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(server)))
+	if r.Code != http.StatusCreated {
+		t.Fatalf("create=%d %s", r.Code, r.Body.String())
+	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if r.Code != http.StatusOK || !strings.HasPrefix(r.Header().Get("Content-Type"), "text/plain") {
+		t.Fatalf("metrics=%d content-type=%q", r.Code, r.Header().Get("Content-Type"))
+	}
+	body := r.Body.String()
+	for _, expected := range []string{"pgsentinel_up 1", `pgsentinel_servers{status="unknown"} 1`, "pgsentinel_health_score 100"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("missing %q in metrics:\n%s", expected, body)
+		}
+	}
+	for _, secret := range []string{"secret-production-name", "private.internal", "super-secret"} {
+		if strings.Contains(body, secret) {
+			t.Fatalf("metrics leaked %q", secret)
+		}
+	}
+}
 func TestRejectsUnknownFields(t *testing.T) {
 	h := testAPI(t)
 	r := httptest.NewRecorder()

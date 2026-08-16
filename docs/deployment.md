@@ -93,6 +93,17 @@ export PGSENTINEL_TRUSTED_PROXY_CIDRS=172.18.0.0/16
 
 PGSentinel ignores `X-Forwarded-For` from every source outside those CIDRs. Do not use a broad trusted range when untrusted workloads can connect from it.
 
+### Prometheus monitoring
+
+Scrape `GET /metrics` for aggregate server status, active findings by severity, the health score, and storage availability. The endpoint is intentionally unauthenticated for Prometheus discovery and exposes no server names, hosts, database names, or credentials. Restrict it at the network or reverse-proxy layer when metrics must not be public on the management network.
+
+```yaml
+scrape_configs:
+  - job_name: pgsentinel
+    static_configs:
+      - targets: ["pgsentinel:8080"]
+```
+
 Notification delivery blocks loopback, private, link-local, carrier-grade NAT, multicast and metadata destinations by default. DNS is checked at connection time and again after redirects to prevent DNS rebinding. For a self-hosted ntfy or webhook service, prefer an exact allowlist:
 
 ```bash
