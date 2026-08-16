@@ -124,6 +124,17 @@ func (s *Store) FilterFindings(ctx context.Context, filter FindingFilter) ([]mod
 	return out, rows.Err()
 }
 func (s *Store) Prune(ctx context.Context, before time.Time) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM snapshots WHERE collected_at < ?`, before.Format(time.RFC3339Nano))
-	return err
+	cutoff := before.Format(time.RFC3339Nano)
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM snapshots WHERE collected_at < ?`, cutoff); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM metrics WHERE collected_at < ?`, cutoff); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
