@@ -12,7 +12,7 @@ func HealthScore(findings []models.Finding) Score {
 	cats := map[string]int{"Performance": 100, "Vacuum": 100, "Queries": 100, "Connections": 100, "Indexes": 100, "Configuration": 100, "Replication": 100}
 	total := 0
 	for _, f := range findings {
-		if f.Status != "active" {
+		if f.Status != "active" && f.Status != "acknowledged" {
 			continue
 		}
 		w := weights[f.Severity]

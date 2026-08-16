@@ -9,22 +9,27 @@ import (
 	"github.com/matta813/pgsentinel/internal/models"
 )
 
-func TestFindingLifecycle(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "test.db"), "long enough encryption key")
+func testMonitoringStore(t *testing.T, name string) (*Store, context.Context) {
+	t.Helper()
+	s, err := Open(filepath.Join(t.TempDir(), name+".db"), "long enough encryption key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
-	ctx := context.Background()
+	t.Cleanup(func() { _ = s.Close() })
+	return s, context.Background()
+}
+
+func TestFindingLifecycle(t *testing.T) {
+	s, ctx := testMonitoringStore(t, "lifecycle")
 	server := models.Server{ID: "s", Name: "db", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
-	if err = s.CreateServer(ctx, &server); err != nil {
+	if err := s.CreateServer(ctx, &server); err != nil {
 		t.Fatal(err)
 	}
 	f := models.Finding{ID: "f", RuleID: "r", Fingerprint: "fp", ServerID: "s", Severity: models.SeverityHigh, Category: "Vacuum", Title: "T", Status: "active", StartedAt: time.Now(), UpdatedAt: time.Now()}
-	if err = s.UpsertFindings(ctx, "s", []models.Finding{f}); err != nil {
+	if err := s.UpsertFindings(ctx, "s", []models.Finding{f}); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.UpsertFindings(ctx, "s", nil); err != nil {
+	if err := s.UpsertFindings(ctx, "s", nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.ListFindings(ctx, "resolved", "")
@@ -33,13 +38,42 @@ func TestFindingLifecycle(t *testing.T) {
 	}
 }
 
-func TestFindingFiltersCanBeCombined(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "filters.db"), "long enough encryption key")
-	if err != nil {
+func TestAcknowledgedFindingPersistsUntilConditionResolves(t *testing.T) {
+	s, ctx := testMonitoringStore(t, "acknowledged")
+	server := models.Server{ID: "s", Name: "db", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
+	if err := s.CreateServer(ctx, &server); err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
-	ctx := context.Background()
+	now := time.Now().UTC()
+	finding := models.Finding{ID: "finding", RuleID: "rule", Fingerprint: "fingerprint", ServerID: "s", Severity: models.SeverityHigh, Category: "Connections", Title: "Saturation", Status: "active", StartedAt: now, UpdatedAt: now}
+	if err := s.UpsertFindings(ctx, "s", []models.Finding{finding}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetFindingStatus(ctx, finding.ID, "acknowledged"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertFindings(ctx, "s", []models.Finding{finding}); err != nil {
+		t.Fatal(err)
+	}
+	acknowledged, err := s.ListFindings(ctx, "acknowledged", "s")
+	if err != nil || len(acknowledged) != 1 {
+		t.Fatalf("acknowledged=%#v err=%v", acknowledged, err)
+	}
+	open, err := s.ListFindings(ctx, "open", "s")
+	if err != nil || len(open) != 1 {
+		t.Fatalf("open=%#v err=%v", open, err)
+	}
+	if err := s.UpsertFindings(ctx, "s", nil); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := s.ListFindings(ctx, "resolved", "s")
+	if err != nil || len(resolved) != 1 {
+		t.Fatalf("resolved=%#v err=%v", resolved, err)
+	}
+}
+
+func TestFindingFiltersCanBeCombined(t *testing.T) {
+	s, ctx := testMonitoringStore(t, "filters")
 	server := models.Server{ID: "s", Name: "db", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
 	if err := s.CreateServer(ctx, &server); err != nil {
 		t.Fatal(err)
@@ -63,18 +97,13 @@ func TestFindingFiltersCanBeCombined(t *testing.T) {
 }
 
 func TestUpdateServerPreservesAndRotatesPassword(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "servers.db"), "long enough encryption key")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	ctx := context.Background()
+	s, ctx := testMonitoringStore(t, "servers")
 	server := models.Server{ID: "server", Name: "old", Host: "old.example", Port: 5432, User: "old-user", Password: "old-password", SSLMode: "prefer"}
-	if err = s.CreateServer(ctx, &server); err != nil {
+	if err := s.CreateServer(ctx, &server); err != nil {
 		t.Fatal(err)
 	}
 	update := models.Server{ID: server.ID, Name: "new", Host: "new.example", Port: 6432, User: "new-user", SSLMode: "require", Tags: []string{"production"}}
-	if err = s.UpdateServer(ctx, &update); err != nil {
+	if err := s.UpdateServer(ctx, &update); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.GetServer(ctx, server.ID, true)
@@ -82,44 +111,36 @@ func TestUpdateServerPreservesAndRotatesPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Name != "new" || got.Host != "new.example" || got.Port != 6432 || got.Password != "old-password" {
-		t.Fatalf("unexpected preserved update: %#v", got)
+		t.Fatalf("unexpected update: %#v", got)
 	}
 	update.Password = "rotated-password"
-	if err = s.UpdateServer(ctx, &update); err != nil {
+	if err := s.UpdateServer(ctx, &update); err != nil {
 		t.Fatal(err)
 	}
 	got, err = s.GetServer(ctx, server.ID, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Password != "rotated-password" {
-		t.Fatalf("password was not rotated: %q", got.Password)
+	if err != nil || got.Password != "rotated-password" {
+		t.Fatalf("password=%q err=%v", got.Password, err)
 	}
 }
 
 func TestPruneRemovesOnlyExpiredSnapshots(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "retention.db"), "long enough encryption key")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	ctx := context.Background()
+	s, ctx := testMonitoringStore(t, "retention")
 	server := models.Server{ID: "retention-server", Name: "retention", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
-	if err = s.CreateServer(ctx, &server); err != nil {
+	if err := s.CreateServer(ctx, &server); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	if err = s.SaveSnapshot(ctx, server.ID, "core", map[string]int{"age": 2}, now.Add(-2*time.Hour)); err != nil {
+	if err := s.SaveSnapshot(ctx, server.ID, "core", map[string]int{"age": 2}, now.Add(-2*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.SaveSnapshot(ctx, server.ID, "core", map[string]int{"age": 0}, now); err != nil {
+	if err := s.SaveSnapshot(ctx, server.ID, "core", map[string]int{"age": 0}, now); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.Prune(ctx, now.Add(-time.Hour)); err != nil {
+	if err := s.Prune(ctx, now.Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	var count int
-	if err = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM snapshots WHERE server_id=?`, server.ID).Scan(&count); err != nil {
+	if err := s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM snapshots WHERE server_id=?`, server.ID).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != 1 {

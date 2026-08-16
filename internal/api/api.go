@@ -58,6 +58,7 @@ func (a *API) routes() {
 	a.mux.HandleFunc("POST /api/v1/servers/{id}/test", a.testServer)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}/metric-history", a.metricHistory)
 	a.mux.HandleFunc("GET /api/v1/problems", a.listProblems)
+	a.mux.HandleFunc("PUT /api/v1/problems/{id}/status", a.updateProblemStatus)
 	a.mux.HandleFunc("GET /api/v1/overview", a.overview)
 	a.mux.HandleFunc("POST /api/v1/notifications/test", a.testNotification)
 	a.mux.HandleFunc("GET /api/v1/notifications", a.listNotificationDestinations)

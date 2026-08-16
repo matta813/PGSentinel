@@ -15,7 +15,7 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 - Multiple PostgreSQL servers, encrypted credentials, SSL modes and connection diagnostics
 - Connections, transactions, databases, locks, tables, vacuum, indexes and configuration collection
 - `pg_stat_statements` query load with a documented multi-factor Query Impact Score
-- Stable problem fingerprints with active, resolved and reopened lifecycle
+- Stable problem fingerprints with active, acknowledged, resolved and reopened lifecycle
 - Evidence-driven rules, confidence, weighted server health and category scores
 - Duplicate/unused index candidates; no automatic destructive database changes
 - encrypted ntfy and generic webhook destinations with delivery tests

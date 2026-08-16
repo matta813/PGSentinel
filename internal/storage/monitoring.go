@@ -36,12 +36,12 @@ func (s *Store) UpsertFindings(ctx context.Context, serverID string, findings []
 		seen[f.Fingerprint] = true
 		evidence, _ := json.Marshal(f.Evidence)
 		suggestions, _ := json.Marshal(f.Suggestions)
-		_, err = tx.ExecContext(ctx, `INSERT INTO findings(id,rule_id,fingerprint,server_id,database_name,resource,severity,category,title,summary,cause,impact,evidence_json,suggestions_json,confidence,status,started_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET severity=excluded.severity,title=excluded.title,summary=excluded.summary,cause=excluded.cause,impact=excluded.impact,evidence_json=excluded.evidence_json,suggestions_json=excluded.suggestions_json,confidence=excluded.confidence,status='active',updated_at=excluded.updated_at,resolved_at=NULL`, f.ID, f.RuleID, f.Fingerprint, f.ServerID, f.Database, f.Resource, f.Severity, f.Category, f.Title, f.Summary, f.Cause, f.Impact, string(evidence), string(suggestions), f.Confidence, "active", f.StartedAt.Format(time.RFC3339Nano), f.UpdatedAt.Format(time.RFC3339Nano))
+		_, err = tx.ExecContext(ctx, `INSERT INTO findings(id,rule_id,fingerprint,server_id,database_name,resource,severity,category,title,summary,cause,impact,evidence_json,suggestions_json,confidence,status,started_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET severity=excluded.severity,title=excluded.title,summary=excluded.summary,cause=excluded.cause,impact=excluded.impact,evidence_json=excluded.evidence_json,suggestions_json=excluded.suggestions_json,confidence=excluded.confidence,status=CASE WHEN findings.status='acknowledged' THEN 'acknowledged' ELSE 'active' END,updated_at=excluded.updated_at,resolved_at=NULL`, f.ID, f.RuleID, f.Fingerprint, f.ServerID, f.Database, f.Resource, f.Severity, f.Category, f.Title, f.Summary, f.Cause, f.Impact, string(evidence), string(suggestions), f.Confidence, "active", f.StartedAt.Format(time.RFC3339Nano), f.UpdatedAt.Format(time.RFC3339Nano))
 		if err != nil {
 			return err
 		}
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT fingerprint FROM findings WHERE server_id=? AND status='active'`, serverID)
+	rows, err := tx.QueryContext(ctx, `SELECT fingerprint FROM findings WHERE server_id=? AND status IN ('active','acknowledged')`, serverID)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,9 @@ func (s *Store) ListFindings(ctx context.Context, status, serverID string) ([]mo
 func (s *Store) FilterFindings(ctx context.Context, filter FindingFilter) ([]models.Finding, error) {
 	q := `SELECT id,rule_id,fingerprint,server_id,database_name,resource,severity,category,title,summary,cause,impact,evidence_json,suggestions_json,confidence,status,started_at,updated_at,resolved_at FROM findings WHERE 1=1`
 	args := []any{}
-	if filter.Status != "" {
+	if filter.Status == "open" {
+		q += " AND status IN ('active','acknowledged')"
+	} else if filter.Status != "" {
 		q += " AND status=?"
 		args = append(args, filter.Status)
 	}
@@ -122,6 +124,20 @@ func (s *Store) FilterFindings(ctx context.Context, filter FindingFilter) ([]mod
 		out = append(out, f)
 	}
 	return out, rows.Err()
+}
+func (s *Store) SetFindingStatus(ctx context.Context, id, status string) error {
+	result, err := s.DB.ExecContext(ctx, `UPDATE findings SET status=?,updated_at=? WHERE id=? AND status IN ('active','acknowledged')`, status, time.Now().UTC().Format(time.RFC3339Nano), id)
+	if err != nil {
+		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 func (s *Store) Prune(ctx context.Context, before time.Time) error {
 	cutoff := before.Format(time.RFC3339Nano)

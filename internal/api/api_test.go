@@ -187,6 +187,27 @@ func TestRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestProblemStatusValidation(t *testing.T) {
+	h := testAPI(t)
+	validID := "6e75d786-e846-47a6-b8f7-406e47c62aa8"
+	tests := []struct {
+		path string
+		body string
+		want int
+	}{
+		{path: "/api/v1/problems/not-a-uuid/status", body: `{"status":"acknowledged"}`, want: http.StatusBadRequest},
+		{path: "/api/v1/problems/" + validID + "/status", body: `{"status":"resolved"}`, want: http.StatusUnprocessableEntity},
+		{path: "/api/v1/problems/" + validID + "/status", body: `{"status":"acknowledged"}`, want: http.StatusNotFound},
+	}
+	for _, test := range tests {
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodPut, test.path, strings.NewReader(test.body)))
+		if r.Code != test.want {
+			t.Fatalf("%s returned %d, want %d: %s", test.path, r.Code, test.want, r.Body.String())
+		}
+	}
+}
+
 func TestProblemFilterValidation(t *testing.T) {
 	h := testAPI(t)
 	for _, path := range []string{"/api/v1/problems?status=pending", "/api/v1/problems?severity=urgent", "/api/v1/problems?search=" + strings.Repeat("x", 201)} {
