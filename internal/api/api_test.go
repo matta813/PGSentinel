@@ -110,6 +110,15 @@ func TestHealthAndServerAPI(t *testing.T) {
 	if r.Code != 200 || !strings.Contains(r.Body.String(), server["id"].(string)) {
 		t.Fatalf("list=%d %s", r.Code, r.Body.String())
 	}
+	update := `{"name":"db01-renamed","host":"db.internal","port":6432,"user":"monitor-v2","sslMode":"require","tags":["production"]}`
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest("PUT", "/api/v1/servers/"+server["id"].(string), strings.NewReader(update)))
+	if r.Code != 200 || !strings.Contains(r.Body.String(), "db01-renamed") {
+		t.Fatalf("update=%d %s", r.Code, r.Body.String())
+	}
+	if strings.Contains(r.Body.String(), "password") {
+		t.Fatal("credential field leaked from update response")
+	}
 }
 
 func TestServerTagsAreNormalizedAndFilterable(t *testing.T) {
@@ -149,6 +158,80 @@ func TestRejectsUnknownFields(t *testing.T) {
 	h.ServeHTTP(r, httptest.NewRequest("POST", "/api/v1/servers", strings.NewReader(`{"name":"x","unexpected":true}`)))
 	if r.Code != 400 {
 		t.Fatalf("got %d", r.Code)
+	}
+}
+
+func TestRejectsOversizedAndMultipleJSONValues(t *testing.T) {
+	h := testAPI(t)
+	tests := []struct {
+		name string
+		body string
+		want int
+	}{
+		{name: "oversized", body: `{"name":"` + strings.Repeat("x", 70<<10) + `"}`, want: http.StatusRequestEntityTooLarge},
+		{name: "multiple values", body: `{"name":"one"} {"name":"two"}`, want: http.StatusBadRequest},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRecorder()
+			h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(test.body)))
+			if r.Code != test.want {
+				t.Fatalf("got %d, want %d: %s", r.Code, test.want, r.Body.String())
+			}
+		})
+	}
+}
+
+func TestMetricHistoryValidation(t *testing.T) {
+	h := testAPI(t)
+	serverID := "1b5c3f33-bfcb-4fd4-9c36-df76e2683ee5"
+	for _, path := range []string{
+		"/api/v1/servers/not-a-uuid/metric-history?name=connections.total",
+		"/api/v1/servers/" + serverID + "/metric-history?name=unknown",
+		"/api/v1/servers/" + serverID + "/metric-history?name=connections.total&limit=1001",
+		"/api/v1/servers/" + serverID + "/metric-history?name=connections.total&from=yesterday",
+	} {
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, path, nil))
+		if r.Code != http.StatusBadRequest && r.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("%s returned %d: %s", path, r.Code, r.Body.String())
+		}
+	}
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/servers/"+serverID+"/metric-history?name=connections.total", nil))
+	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != "[]" {
+		t.Fatalf("empty history=%d %s", r.Code, r.Body.String())
+	}
+}
+
+func TestNotificationDestinationAPIKeepsSecretsPrivate(t *testing.T) {
+	h := testAPI(t)
+	body := `{"name":"Operations","provider":"ntfy","enabled":true,"serverUrl":"https://ntfy.sh","topic":"ops","token":"top-secret"}`
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/notifications", strings.NewReader(body)))
+	if r.Code != http.StatusCreated || strings.Contains(r.Body.String(), "top-secret") || strings.Contains(r.Body.String(), "serverUrl") {
+		t.Fatalf("create=%d %s", r.Code, r.Body.String())
+	}
+	var destination map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&destination); err != nil {
+		t.Fatal(err)
+	}
+	id := destination["id"].(string)
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/notifications", nil))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), "Operations") || strings.Contains(r.Body.String(), "top-secret") {
+		t.Fatalf("list=%d %s", r.Code, r.Body.String())
+	}
+	update := `{"name":"Platform","provider":"webhook","enabled":false,"webhookUrl":"https://example.com/hooks/private"}`
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPut, "/api/v1/notifications/"+id, strings.NewReader(update)))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), "Platform") || strings.Contains(r.Body.String(), "hooks/private") {
+		t.Fatalf("update=%d %s", r.Code, r.Body.String())
+	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodDelete, "/api/v1/notifications/"+id, nil))
+	if r.Code != http.StatusNoContent {
+		t.Fatalf("delete=%d %s", r.Code, r.Body.String())
 	}
 }
 
