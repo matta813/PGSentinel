@@ -37,7 +37,7 @@ func main() {
 	defer store.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	manager := collector.NewManager(store, log, cfg.StatsInterval)
+	manager := collector.NewManager(store, log, cfg.StatsInterval, cfg.Retention)
 	go manager.Run(ctx)
 	authentication, err := auth.New(auth.Config{Password: cfg.AdminPassword, SecureCookies: cfg.SecureCookies, TrustedProxies: cfg.TrustedProxyCIDRs})
 	if err != nil {
