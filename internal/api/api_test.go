@@ -138,6 +138,27 @@ func TestRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestRejectsOversizedAndMultipleJSONValues(t *testing.T) {
+	h := testAPI(t)
+	tests := []struct {
+		name string
+		body string
+		want int
+	}{
+		{name: "oversized", body: `{"name":"` + strings.Repeat("x", 70<<10) + `"}`, want: http.StatusRequestEntityTooLarge},
+		{name: "multiple values", body: `{"name":"one"} {"name":"two"}`, want: http.StatusBadRequest},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRecorder()
+			h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(test.body)))
+			if r.Code != test.want {
+				t.Fatalf("got %d, want %d: %s", r.Code, test.want, r.Body.String())
+			}
+		})
+	}
+}
+
 func TestMetricHistoryValidation(t *testing.T) {
 	h := testAPI(t)
 	serverID := "1b5c3f33-bfcb-4fd4-9c36-df76e2683ee5"

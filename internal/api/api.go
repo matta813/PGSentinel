@@ -8,6 +8,7 @@ import (
 	"github.com/matta813/pgsentinel/internal/buildinfo"
 	"github.com/matta813/pgsentinel/internal/notifications"
 	"github.com/matta813/pgsentinel/internal/storage"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -99,11 +100,21 @@ func failure(w http.ResponseWriter, status int, msg string, err error) {
 	write(w, status, map[string]string{"error": msg, "detail": detail})
 }
 func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	const maxJSONBody = 64 << 10
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			failure(w, http.StatusRequestEntityTooLarge, "Request body too large", nil)
+			return false
+		}
 		failure(w, 400, "Invalid request", err)
+		return false
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		failure(w, 400, "Request must contain exactly one JSON value", err)
 		return false
 	}
 	return true

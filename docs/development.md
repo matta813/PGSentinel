@@ -15,6 +15,8 @@ In another terminal, `make frontend`; Vite proxies API requests to port 8080. `m
 
 Add migrations as ordered files under `migrations/`. Rules should be deterministic, return actionable evidence, state uncertainty, and include unit tests at threshold boundaries. Collector queries must be read-only, bounded, version-aware for PostgreSQL 15+, and avoid large unbounded result sets. Never log a server object containing its decrypted password.
 
+API JSON requests are limited to 64 KiB, reject unknown fields, and must contain exactly one JSON value. Keep request models intentionally small; add a dedicated streaming endpoint if a future feature needs larger payloads.
+
 ## Collector schedules
 
 Collector work is split across four independently configurable schedules. `PGSENTINEL_FAST_INTERVAL` refreshes connections and locks, `PGSENTINEL_STATS_INTERVAL` refreshes core statistics and query data, `PGSENTINEL_SLOW_INTERVAL` refreshes tables and indexes, and `PGSENTINEL_META_INTERVAL` refreshes server configuration. Startup performs one complete cycle so every resource is immediately populated; partial cycles reuse the latest snapshots when running the analyzer.
