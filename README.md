@@ -147,7 +147,7 @@ See the [documentation index](docs/README.md), [architecture](docs/architecture.
 
 ## API
 
-Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
+Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. The problem inbox supports combinable `status`, `serverId`, `severity`, `category`, and `search` query parameters. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
 
 ## Roadmap and limitations
 
