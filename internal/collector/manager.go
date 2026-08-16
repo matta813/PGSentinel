@@ -95,9 +95,25 @@ func (m *Manager) collect(ctx context.Context, s models.Server) {
 	snap.Settings = settings
 	_ = m.store.SaveSnapshot(ctx, s.ID, "configuration", settings, snap.CollectedAt)
 	_ = m.store.SaveSnapshot(ctx, s.ID, "core", snap, snap.CollectedAt)
+	_ = m.store.SaveMetrics(ctx, snapshotMetrics(snap))
 	findings := m.engine.Analyze(snap)
 	findings = append(findings, analyzer.IndexFindings(s.ID, indexes)...)
 	_ = m.store.UpsertFindings(ctx, s.ID, findings)
 	_ = m.store.UpdateServerStatus(ctx, s.ID, "healthy", snap.Version, "", true)
 	m.log.Info("monitoring cycle complete", "server_id", s.ID, "findings", len(findings))
+}
+
+func snapshotMetrics(s models.Snapshot) []models.Metric {
+	values := map[string]float64{
+		"connections.active":      float64(s.Connections.Active),
+		"connections.total":       float64(s.Connections.Total),
+		"connections.utilization": s.Connections.Utilization,
+		"connections.waiting":     float64(s.Connections.Waiting),
+		"server.uptime_seconds":   s.UptimeSeconds,
+	}
+	out := make([]models.Metric, 0, len(values))
+	for name, value := range values {
+		out = append(out, models.Metric{ServerID: s.ServerID, Name: name, Value: value, CollectedAt: s.CollectedAt})
+	}
+	return out
 }

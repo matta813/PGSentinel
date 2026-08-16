@@ -147,7 +147,7 @@ See the [documentation index](docs/README.md), [architecture](docs/architecture.
 
 ## API
 
-Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, notification destination CRUD, and notification testing. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
+Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, historical core metrics, queries, tables, indexes, locks, vacuum, configuration, notification destination CRUD, and notification testing. Metric history is available at `GET /api/v1/servers/{id}/metric-history?name=connections.total`; optional `from` and `limit` parameters constrain the series. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
 
 ## Roadmap and limitations
 
