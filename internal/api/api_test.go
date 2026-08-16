@@ -161,6 +161,17 @@ func TestRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestProblemFilterValidation(t *testing.T) {
+	h := testAPI(t)
+	for _, path := range []string{"/api/v1/problems?status=pending", "/api/v1/problems?severity=urgent", "/api/v1/problems?search=" + strings.Repeat("x", 201)} {
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, path, nil))
+		if r.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("%s returned %d: %s", path, r.Code, r.Body.String())
+		}
+	}
+}
+
 func TestRejectsOversizedAndMultipleJSONValues(t *testing.T) {
 	h := testAPI(t)
 	tests := []struct {
