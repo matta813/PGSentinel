@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
-	"time"
 )
 
 type Message struct {
@@ -26,11 +24,12 @@ type Webhook struct {
 	client  *http.Client
 }
 
-func NewWebhook(target string, headers map[string]string) (*Webhook, error) {
-	if err := safeURL(target); err != nil {
+func NewWebhook(target string, headers map[string]string, policies ...TargetPolicy) (*Webhook, error) {
+	policy := selectedPolicy(policies)
+	if err := policy.validateURL(target); err != nil {
 		return nil, err
 	}
-	return &Webhook{URL: target, Headers: headers, client: &http.Client{Timeout: 10 * time.Second}}, nil
+	return &Webhook{URL: target, Headers: headers, client: policy.client()}, nil
 }
 func (w *Webhook) Send(ctx context.Context, m Message) error {
 	body, _ := json.Marshal(m)
@@ -56,13 +55,15 @@ func (w *Webhook) Send(ctx context.Context, m Message) error {
 type Ntfy struct {
 	ServerURL, Topic, Token, Username, Password string
 	client                                      *http.Client
+	policy                                      TargetPolicy
 }
 
-func NewNtfy(serverURL, topic string) *Ntfy {
-	return &Ntfy{ServerURL: strings.TrimRight(serverURL, "/"), Topic: topic, client: &http.Client{Timeout: 10 * time.Second}}
+func NewNtfy(serverURL, topic string, policies ...TargetPolicy) *Ntfy {
+	policy := selectedPolicy(policies)
+	return &Ntfy{ServerURL: strings.TrimRight(serverURL, "/"), Topic: topic, client: policy.client(), policy: policy}
 }
 func (n *Ntfy) Send(ctx context.Context, m Message) error {
-	if err := safeURL(n.ServerURL); err != nil {
+	if err := n.policy.validateURL(n.ServerURL); err != nil {
 		return err
 	}
 	payload := map[string]any{"topic": n.Topic, "title": m.Title, "message": m.Body, "priority": priority(m.Severity), "tags": []string{"elephant", "warning"}}
@@ -99,10 +100,9 @@ func priority(s string) int {
 		return 2
 	}
 }
-func safeURL(raw string) error {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
-		return fmt.Errorf("provider URL must be an absolute HTTP(S) URL")
+func selectedPolicy(policies []TargetPolicy) TargetPolicy {
+	if len(policies) > 0 {
+		return policies[0]
 	}
-	return nil
+	return TargetPolicy{}
 }

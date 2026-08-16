@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/storage"
 	"io"
 	"log/slog"
@@ -21,7 +22,68 @@ func testAPI(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	return New(s, slog.New(slog.NewTextHandler(io.Discard, nil))).Handler()
+	manager, err := auth.New(auth.Config{Password: "a-secure-test-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{Auth: manager}).Handler()
+	capture := httptest.NewRecorder()
+	if err := manager.Start(capture); err != nil {
+		t.Fatal(err)
+	}
+	cookie := capture.Result().Cookies()[0]
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/") && r.URL.Path != "/api/v1/auth/login" && r.URL.Path != "/api/v1/version" {
+			r.AddCookie(cookie)
+		}
+		handler.ServeHTTP(w, r)
+	})
+}
+
+func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
+	s, err := storage.Open(filepath.Join(t.TempDir(), "auth.db"), "a sufficiently long api test key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	manager, err := auth.New(auth.Config{Password: "a-secure-test-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{Auth: manager}).Handler()
+
+	r := httptest.NewRecorder()
+	handler.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/servers", nil))
+	if r.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated=%d", r.Code)
+	}
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"password":"a-secure-test-password"}`)))
+	if r.Code != http.StatusOK || len(r.Result().Cookies()) != 1 {
+		t.Fatalf("login=%d %s", r.Code, r.Body.String())
+	}
+	cookie := r.Result().Cookies()[0]
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
+	req.AddCookie(cookie)
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, req)
+	if r.Code != http.StatusOK {
+		t.Fatalf("session=%d", r.Code)
+	}
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	req.AddCookie(cookie)
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, req)
+	if r.Code != http.StatusOK {
+		t.Fatalf("logout=%d", r.Code)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
+	req.AddCookie(cookie)
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, req)
+	if r.Code != http.StatusUnauthorized {
+		t.Fatalf("logged-out session=%d", r.Code)
+	}
 }
 func TestHealthAndServerAPI(t *testing.T) {
 	h := testAPI(t)

@@ -5,6 +5,7 @@ Install Go 1.26 and Node 24+, then `npm ci --prefix frontend`. Run the API with 
 ```bash
 export PGSENTINEL_DATA_DIR="$PWD/data"
 export PGSENTINEL_ENCRYPTION_KEY=development-only-change-this-key
+export PGSENTINEL_ADMIN_PASSWORD=development-only-admin-password
 make backend
 ```
 

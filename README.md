@@ -27,6 +27,7 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 
 ```bash
 export PGSENTINEL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+export PGSENTINEL_ADMIN_PASSWORD="replace-with-a-long-random-password"
 docker compose pull
 docker compose up -d
 ```
@@ -50,6 +51,7 @@ services:
     environment:
       TZ: Europe/Zurich
       PGSENTINEL_ENCRYPTION_KEY: "replace-with-a-long-random-secret"
+      PGSENTINEL_ADMIN_PASSWORD: "replace-with-a-long-random-password"
 ```
 
 The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity. Keep the encryption key stable—losing it makes stored credentials unrecoverable.
@@ -82,11 +84,16 @@ After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and e
 | Variable | Default | Meaning |
 |---|---:|---|
 | `PGSENTINEL_ENCRYPTION_KEY` | required | Master secret used for AES-GCM credential encryption |
+| `PGSENTINEL_ADMIN_PASSWORD` | required | Administrator login password (minimum 12 characters) |
+| `PGSENTINEL_SECURE_COOKIES` | `false` | Mark session cookies Secure; enable behind production HTTPS |
+| `PGSENTINEL_NOTIFICATION_ALLOWED_HOSTS` | empty | Exact comma-separated hosts allowed for private notification targets |
+| `PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS` | `false` | Permit every private notification target; prefer the host allowlist |
 | `PGSENTINEL_LISTEN_ADDR` | `:8080` | HTTP listen address |
 | `PGSENTINEL_DATA_DIR` | `/data` | SQLite data directory |
 | `PGSENTINEL_STATS_INTERVAL` | `30s` | Monitoring cycle interval |
 | `PGSENTINEL_RETENTION` | `720h` | Configured retention horizon |
 | `PGSENTINEL_LOG_LEVEL` | `info` | `info` or `debug` structured JSON logging |
+| `PGSENTINEL_TRUSTED_PROXY_CIDRS` | empty | Exact reverse-proxy CIDRs allowed to supply `X-Forwarded-For` |
 
 Passwords, tokens, and full connection URLs are never logged or returned by normal APIs. Normalized `pg_stat_statements.query` text can still contain literals for statements that PostgreSQL cannot normalize; treat database access as sensitive.
 
@@ -120,6 +127,7 @@ Requires Go 1.26, Node 24+, npm and optionally Docker.
 ```bash
 npm ci --prefix frontend
 export PGSENTINEL_ENCRYPTION_KEY=development-only-change-this-key
+export PGSENTINEL_ADMIN_PASSWORD=development-only-admin-password
 make test
 make lint
 make build
@@ -129,7 +137,7 @@ See the [documentation index](docs/README.md), [architecture](docs/architecture.
 
 ## API
 
-Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. `GET /health` is a liveness probe; `GET /ready` verifies SQLite.
+Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
 
 ## Roadmap and limitations
 

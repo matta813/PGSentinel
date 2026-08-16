@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/buildinfo"
+	"github.com/matta813/pgsentinel/internal/notifications"
 	"github.com/matta813/pgsentinel/internal/storage"
 	"io/fs"
 	"log/slog"
@@ -15,23 +17,37 @@ import (
 )
 
 type API struct {
-	store *storage.Store
-	log   *slog.Logger
-	mux   *http.ServeMux
+	store              *storage.Store
+	log                *slog.Logger
+	mux                *http.ServeMux
+	auth               *auth.Manager
+	notificationPolicy notifications.TargetPolicy
 }
 
-func New(store *storage.Store, log *slog.Logger) *API {
-	a := &API{store: store, log: log, mux: http.NewServeMux()}
+type Options struct {
+	Auth               *auth.Manager
+	NotificationPolicy notifications.TargetPolicy
+}
+
+func New(store *storage.Store, log *slog.Logger, options ...Options) *API {
+	var opts Options
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	a := &API{store: store, log: log, mux: http.NewServeMux(), auth: opts.Auth, notificationPolicy: opts.NotificationPolicy}
 	a.routes()
 	return a
 }
-func (a *API) Handler() http.Handler { return security(a.mux) }
+func (a *API) Handler() http.Handler { return security(a.authenticate(a.mux)) }
 func (a *API) routes() {
 	a.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		write(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	a.mux.HandleFunc("GET /ready", a.ready)
 	a.mux.HandleFunc("GET /api/v1/version", func(w http.ResponseWriter, _ *http.Request) { write(w, http.StatusOK, buildinfo.Current()) })
+	a.mux.HandleFunc("POST /api/v1/auth/login", a.login)
+	a.mux.HandleFunc("GET /api/v1/auth/session", a.session)
+	a.mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
 	a.mux.HandleFunc("GET /api/v1/servers", a.listServers)
 	a.mux.HandleFunc("POST /api/v1/servers", a.createServer)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}", a.getServer)
