@@ -98,6 +98,34 @@ func (s *Store) CreateServer(ctx context.Context, v *models.Server) error {
 	_, err = s.DB.ExecContext(ctx, `INSERT INTO servers(id,name,host,port,username,password_cipher,ssl_mode,status,tags_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, v.ID, v.Name, v.Host, v.Port, v.User, pass, v.SSLMode, v.Status, string(tags), now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	return err
 }
+func (s *Store) UpdateServer(ctx context.Context, v *models.Server) error {
+	tags, _ := json.Marshal(v.Tags)
+	now := time.Now().UTC()
+	var (
+		result sql.Result
+		err    error
+	)
+	if v.Password == "" {
+		result, err = s.DB.ExecContext(ctx, `UPDATE servers SET name=?,host=?,port=?,username=?,ssl_mode=?,tags_json=?,updated_at=? WHERE id=?`, v.Name, v.Host, v.Port, v.User, v.SSLMode, string(tags), now.Format(time.RFC3339Nano), v.ID)
+	} else {
+		pass, encryptErr := s.cipher.Encrypt(v.Password)
+		if encryptErr != nil {
+			return encryptErr
+		}
+		result, err = s.DB.ExecContext(ctx, `UPDATE servers SET name=?,host=?,port=?,username=?,password_cipher=?,ssl_mode=?,tags_json=?,updated_at=? WHERE id=?`, v.Name, v.Host, v.Port, v.User, pass, v.SSLMode, string(tags), now.Format(time.RFC3339Nano), v.ID)
+	}
+	if err != nil {
+		return err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
 func (s *Store) ListServers(ctx context.Context) ([]models.Server, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT id,name,host,port,username,ssl_mode,version,status,last_connected_at,last_error,tags_json,created_at,updated_at FROM servers ORDER BY name`)
 	if err != nil {

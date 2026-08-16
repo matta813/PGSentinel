@@ -12,15 +12,16 @@ import (
 )
 
 type Manager struct {
-	store    *storage.Store
-	engine   *analyzer.Engine
-	log      *slog.Logger
-	interval time.Duration
-	wg       sync.WaitGroup
+	store     *storage.Store
+	engine    *analyzer.Engine
+	log       *slog.Logger
+	interval  time.Duration
+	retention time.Duration
+	wg        sync.WaitGroup
 }
 
-func NewManager(store *storage.Store, log *slog.Logger, interval time.Duration) *Manager {
-	return &Manager{store: store, engine: analyzer.New(analyzer.DefaultThresholds()), log: log, interval: interval}
+func NewManager(store *storage.Store, log *slog.Logger, interval, retention time.Duration) *Manager {
+	return &Manager{store: store, engine: analyzer.New(analyzer.DefaultThresholds()), log: log, interval: interval, retention: retention}
 }
 func (m *Manager) Run(ctx context.Context) {
 	m.wg.Add(1)
@@ -37,9 +38,15 @@ func (m *Manager) Run(ctx context.Context) {
 		case <-ticker.C:
 			m.collectAll(ctx)
 		case <-prune.C:
-			_ = m.store.Prune(ctx, time.Now().Add(-30*24*time.Hour))
+			if err := m.prune(ctx, time.Now()); err != nil {
+				m.log.Warn("prune monitoring history", "error", err)
+			}
 		}
 	}
+}
+
+func (m *Manager) prune(ctx context.Context, now time.Time) error {
+	return m.store.Prune(ctx, now.Add(-m.retention))
 }
 func (m *Manager) collectAll(ctx context.Context) {
 	servers, err := m.store.ListServers(ctx)

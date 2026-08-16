@@ -110,6 +110,15 @@ func TestHealthAndServerAPI(t *testing.T) {
 	if r.Code != 200 || !strings.Contains(r.Body.String(), server["id"].(string)) {
 		t.Fatalf("list=%d %s", r.Code, r.Body.String())
 	}
+	update := `{"name":"db01-renamed","host":"db.internal","port":6432,"user":"monitor-v2","sslMode":"require","tags":["production"]}`
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest("PUT", "/api/v1/servers/"+server["id"].(string), strings.NewReader(update)))
+	if r.Code != 200 || !strings.Contains(r.Body.String(), "db01-renamed") {
+		t.Fatalf("update=%d %s", r.Code, r.Body.String())
+	}
+	if strings.Contains(r.Body.String(), "password") {
+		t.Fatal("credential field leaked from update response")
+	}
 }
 
 func TestVersionAPI(t *testing.T) {
