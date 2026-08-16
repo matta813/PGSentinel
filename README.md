@@ -147,7 +147,7 @@ See the [documentation index](docs/README.md), [architecture](docs/architecture.
 
 ## API
 
-Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
+Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. Server tags are normalized when a target is created and can be filtered with `GET /api/v1/servers?tag=production`. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
 
 ## Roadmap and limitations
 

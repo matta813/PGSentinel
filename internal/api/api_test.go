@@ -112,6 +112,29 @@ func TestHealthAndServerAPI(t *testing.T) {
 	}
 }
 
+func TestServerTagsAreNormalizedAndFilterable(t *testing.T) {
+	h := testAPI(t)
+	servers := []string{
+		`{"name":"production","host":"prod","user":"monitor","password":"secret","tags":[" Production ","EU","production",""]}`,
+		`{"name":"staging","host":"stage","user":"monitor","password":"secret","tags":["staging"]}`,
+	}
+	for _, body := range servers {
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(body)))
+		if r.Code != http.StatusCreated {
+			t.Fatalf("create=%d %s", r.Code, r.Body.String())
+		}
+	}
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/servers?tag=production", nil))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"name":"production"`) || strings.Contains(r.Body.String(), `"name":"staging"`) {
+		t.Fatalf("filtered=%d %s", r.Code, r.Body.String())
+	}
+	if strings.Count(r.Body.String(), "Production") != 1 || !strings.Contains(r.Body.String(), `"tags":["EU","Production"]`) {
+		t.Fatalf("tags were not normalized: %s", r.Body.String())
+	}
+}
+
 func TestVersionAPI(t *testing.T) {
 	h := testAPI(t)
 	r := httptest.NewRecorder()
