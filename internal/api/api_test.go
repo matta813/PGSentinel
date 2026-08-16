@@ -129,6 +129,37 @@ func TestRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestNotificationDestinationAPIKeepsSecretsPrivate(t *testing.T) {
+	h := testAPI(t)
+	body := `{"name":"Operations","provider":"ntfy","enabled":true,"serverUrl":"https://ntfy.sh","topic":"ops","token":"top-secret"}`
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/notifications", strings.NewReader(body)))
+	if r.Code != http.StatusCreated || strings.Contains(r.Body.String(), "top-secret") || strings.Contains(r.Body.String(), "serverUrl") {
+		t.Fatalf("create=%d %s", r.Code, r.Body.String())
+	}
+	var destination map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&destination); err != nil {
+		t.Fatal(err)
+	}
+	id := destination["id"].(string)
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/notifications", nil))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), "Operations") || strings.Contains(r.Body.String(), "top-secret") {
+		t.Fatalf("list=%d %s", r.Code, r.Body.String())
+	}
+	update := `{"name":"Platform","provider":"webhook","enabled":false,"webhookUrl":"https://example.com/hooks/private"}`
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPut, "/api/v1/notifications/"+id, strings.NewReader(update)))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), "Platform") || strings.Contains(r.Body.String(), "hooks/private") {
+		t.Fatalf("update=%d %s", r.Code, r.Body.String())
+	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodDelete, "/api/v1/notifications/"+id, nil))
+	if r.Code != http.StatusNoContent {
+		t.Fatalf("delete=%d %s", r.Code, r.Body.String())
+	}
+}
+
 func TestFrontendDoesNotServeFilesOutsideRoot(t *testing.T) {
 	parent := t.TempDir()
 	root := filepath.Join(parent, "web")
