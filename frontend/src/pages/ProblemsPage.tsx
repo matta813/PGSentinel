@@ -1,2 +1,31 @@
-import{useMemo,useState}from'react';import{api}from'../api/client';import{Empty,ErrorState,Loading,SeverityBadge}from'../components/Status';import{useApi}from'../hooks/useApi';import type{Finding,Severity}from'../types';
-export function ProblemsPage(){const{data,error,loading,reload}=useApi(()=>api.get<Finding[]>('/problems'),[]);const[severity,setSeverity]=useState('ALL');const[status,setStatus]=useState('active');const filtered=useMemo(()=>data?.filter(f=>(severity==='ALL'||f.severity===severity)&&(status==='all'||f.status===status))??[],[data,severity,status]);if(loading)return <Loading/>;if(error)return <ErrorState error={error} retry={reload}/>;return <><div className="title-row"><div><p className="eyebrow">Problems inbox</p><h1>What needs attention</h1><p>Findings persist, update and resolve as conditions change.</p></div></div><div className="filters"><select aria-label="Severity" value={severity} onChange={e=>setSeverity(e.target.value)}><option>ALL</option>{(['CRITICAL','HIGH','MEDIUM','LOW','INFO'] as Severity[]).map(s=><option key={s}>{s}</option>)}</select><select aria-label="Status" value={status} onChange={e=>setStatus(e.target.value)}><option value="active">Active</option><option value="resolved">Resolved</option><option value="all">All</option></select></div>{filtered.length===0?<Empty title="Inbox is clear" detail="No problems match the selected filters."/>:<div className="inbox">{filtered.map(f=><details key={f.id} className="finding"><summary><SeverityBadge severity={f.severity}/><div><strong>{f.title}</strong><span>{f.database||'Server'}{f.resource&&` · ${f.resource}`} · {f.category}</span><p>{f.summary}</p></div></summary><div className="finding-detail"><h3>Why it matters</h3><p>{f.impact}</p><h3>Observed evidence</h3><div className="evidence">{f.evidence?.map(e=><div key={e.label}><span>{e.label}</span><strong>{e.value}</strong></div>)}</div><h3>Suggested investigation</h3><ol>{f.suggestions?.map((s,i)=><li key={i}>{s.title}{s.detail&&<small>{s.detail}</small>}</li>)}</ol><p className="confidence">Confidence: <strong>{f.confidence}</strong></p></div></details>)}</div>}</>}
+import { useMemo, useState } from 'react';
+import { Check, RotateCcw } from 'lucide-react';
+import { api, APIError } from '../api/client';
+import { Empty, ErrorState, Loading, SeverityBadge } from '../components/Status';
+import { useApi } from '../hooks/useApi';
+import type { Finding, Severity } from '../types';
+
+export function ProblemsPage() {
+  const { data, error, loading, reload } = useApi(() => api.get<Finding[]>('/problems'), []);
+  const [severity, setSeverity] = useState('ALL');
+  const [status, setStatus] = useState('active');
+  const [message, setMessage] = useState('');
+  const filtered = useMemo(() => data?.filter(f => (severity === 'ALL' || f.severity === severity) && (status === 'all' || f.status === status)) ?? [], [data, severity, status]);
+  async function setFindingStatus(id: string, nextStatus: 'active' | 'acknowledged') {
+    setMessage('');
+    try {
+      await api.put(`/problems/${id}/status`, { status: nextStatus });
+      void reload();
+    } catch (e) {
+      setMessage(e instanceof APIError ? `${e.message}: ${e.detail}` : 'Unable to update problem');
+    }
+  }
+  if (loading) return <Loading />;
+  if (error) return <ErrorState error={error} retry={reload} />;
+  return <>
+    <div className="title-row"><div><p className="eyebrow">Problems inbox</p><h1>What needs attention</h1><p>Acknowledge investigated findings without hiding their health impact.</p></div></div>
+    {message && <div className="notice">{message}</div>}
+    <div className="filters"><select aria-label="Severity" value={severity} onChange={e => setSeverity(e.target.value)}><option>ALL</option>{(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as Severity[]).map(s => <option key={s}>{s}</option>)}</select><select aria-label="Status" value={status} onChange={e => setStatus(e.target.value)}><option value="active">Active</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option><option value="all">All</option></select></div>
+    {filtered.length === 0 ? <Empty title="Inbox is clear" detail="No problems match the selected filters." /> : <div className="inbox">{filtered.map(f => <details key={f.id} className="finding"><summary><SeverityBadge severity={f.severity} /><div><strong>{f.title}</strong><span>{f.database || 'Server'}{f.resource && ` · ${f.resource}`} · {f.category} · {f.status}</span><p>{f.summary}</p></div></summary><div className="finding-detail"><h3>Why it matters</h3><p>{f.impact}</p><h3>Observed evidence</h3><div className="evidence">{f.evidence?.map(e => <div key={e.label}><span>{e.label}</span><strong>{e.value}</strong></div>)}</div><h3>Suggested investigation</h3><ol>{f.suggestions?.map((s, i) => <li key={i}>{s.title}{s.detail && <small>{s.detail}</small>}</li>)}</ol><p className="confidence">Confidence: <strong>{f.confidence}</strong></p>{f.status === 'active' && <button onClick={() => void setFindingStatus(f.id, 'acknowledged')}><Check /> Acknowledge</button>}{f.status === 'acknowledged' && <button className="secondary" onClick={() => void setFindingStatus(f.id, 'active')}><RotateCcw /> Reopen</button>}</div></details>)}</div>}
+  </>;
+}

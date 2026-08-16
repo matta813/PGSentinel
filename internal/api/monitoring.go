@@ -17,13 +17,38 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, items)
 }
+func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		failure(w, 400, "Invalid problem ID", nil)
+		return
+	}
+	var request struct {
+		Status string `json:"status"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	if request.Status != "active" && request.Status != "acknowledged" {
+		failure(w, 422, "Status must be active or acknowledged", nil)
+		return
+	}
+	if err := a.store.SetFindingStatus(r.Context(), id, request.Status); err == sql.ErrNoRows {
+		failure(w, 404, "Active problem not found", nil)
+		return
+	} else if err != nil {
+		failure(w, 500, "Unable to update problem", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 	servers, err := a.store.ListServers(r.Context())
 	if err != nil {
 		failure(w, 500, "Unable to load overview", err)
 		return
 	}
-	findings, err := a.store.ListFindings(r.Context(), "active", "")
+	findings, err := a.store.ListFindings(r.Context(), "open", "")
 	if err != nil {
 		failure(w, 500, "Unable to load overview", err)
 		return
