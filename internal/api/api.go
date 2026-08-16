@@ -8,6 +8,7 @@ import (
 	"github.com/matta813/pgsentinel/internal/buildinfo"
 	"github.com/matta813/pgsentinel/internal/notifications"
 	"github.com/matta813/pgsentinel/internal/storage"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -44,6 +45,7 @@ func (a *API) routes() {
 		write(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	a.mux.HandleFunc("GET /ready", a.ready)
+	a.mux.HandleFunc("GET /metrics", a.prometheusMetrics)
 	a.mux.HandleFunc("GET /api/v1/version", func(w http.ResponseWriter, _ *http.Request) { write(w, http.StatusOK, buildinfo.Current()) })
 	a.mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	a.mux.HandleFunc("GET /api/v1/auth/session", a.session)
@@ -51,12 +53,18 @@ func (a *API) routes() {
 	a.mux.HandleFunc("GET /api/v1/servers", a.listServers)
 	a.mux.HandleFunc("POST /api/v1/servers", a.createServer)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}", a.getServer)
+	a.mux.HandleFunc("PUT /api/v1/servers/{id}", a.updateServer)
 	a.mux.HandleFunc("DELETE /api/v1/servers/{id}", a.deleteServer)
 	a.mux.HandleFunc("POST /api/v1/servers/{id}/test", a.testServer)
+	a.mux.HandleFunc("GET /api/v1/servers/{id}/metric-history", a.metricHistory)
 	a.mux.HandleFunc("GET /api/v1/problems", a.listProblems)
 	a.mux.HandleFunc("PUT /api/v1/problems/{id}/status", a.updateProblemStatus)
 	a.mux.HandleFunc("GET /api/v1/overview", a.overview)
 	a.mux.HandleFunc("POST /api/v1/notifications/test", a.testNotification)
+	a.mux.HandleFunc("GET /api/v1/notifications", a.listNotificationDestinations)
+	a.mux.HandleFunc("POST /api/v1/notifications", a.createNotificationDestination)
+	a.mux.HandleFunc("PUT /api/v1/notifications/{id}", a.updateNotificationDestination)
+	a.mux.HandleFunc("DELETE /api/v1/notifications/{id}", a.deleteNotificationDestination)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}/{resource}", a.serverResource)
 }
 
@@ -94,11 +102,21 @@ func failure(w http.ResponseWriter, status int, msg string, err error) {
 	write(w, status, map[string]string{"error": msg, "detail": detail})
 }
 func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	const maxJSONBody = 64 << 10
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			failure(w, http.StatusRequestEntityTooLarge, "Request body too large", nil)
+			return false
+		}
 		failure(w, 400, "Invalid request", err)
+		return false
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		failure(w, 400, "Request must contain exactly one JSON value", err)
 		return false
 	}
 	return true

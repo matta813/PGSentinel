@@ -4,13 +4,79 @@ import (
 	"database/sql"
 	"github.com/matta813/pgsentinel/internal/analyzer"
 	"github.com/matta813/pgsentinel/internal/models"
+	"github.com/matta813/pgsentinel/internal/storage"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
+var historicalMetrics = map[string]bool{
+	"connections.active": true, "connections.total": true, "connections.utilization": true,
+	"connections.waiting": true, "server.uptime_seconds": true,
+}
+
+func (a *API) metricHistory(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		failure(w, 400, "Invalid server ID", nil)
+		return
+	}
+	name := r.URL.Query().Get("name")
+	if !historicalMetrics[name] {
+		failure(w, 422, "Unsupported metric name", nil)
+		return
+	}
+	limit := 200
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 1000 {
+			failure(w, 422, "Limit must be between 1 and 1000", nil)
+			return
+		}
+		limit = parsed
+	}
+	var from time.Time
+	if raw := r.URL.Query().Get("from"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			failure(w, 422, "From must be an RFC3339 timestamp", nil)
+			return
+		}
+		from = parsed
+	}
+	metrics, err := a.store.ListMetrics(r.Context(), id, name, from, limit)
+	if err != nil {
+		failure(w, 500, "Unable to load metric history", err)
+		return
+	}
+	write(w, 200, metrics)
+}
+
 func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
-	status := r.URL.Query().Get("status")
-	serverID := r.URL.Query().Get("serverId")
-	items, err := a.store.ListFindings(r.Context(), status, serverID)
+	filter := storage.FindingFilter{
+		Status: r.URL.Query().Get("status"), ServerID: r.URL.Query().Get("serverId"),
+		Severity: strings.ToUpper(r.URL.Query().Get("severity")), Category: strings.TrimSpace(r.URL.Query().Get("category")), Search: strings.TrimSpace(r.URL.Query().Get("search")),
+	}
+	if filter.Status == "all" {
+		filter.Status = ""
+	}
+	if filter.Status != "" && filter.Status != "active" && filter.Status != "resolved" {
+		failure(w, 422, "Unsupported problem status", nil)
+		return
+	}
+	if filter.Severity != "" {
+		valid := map[string]bool{"CRITICAL": true, "HIGH": true, "MEDIUM": true, "LOW": true, "INFO": true}
+		if !valid[filter.Severity] {
+			failure(w, 422, "Unsupported severity", nil)
+			return
+		}
+	}
+	if len(filter.Search) > 200 {
+		failure(w, 422, "Search text is too long", nil)
+		return
+	}
+	items, err := a.store.FilterFindings(r.Context(), filter)
 	if err != nil {
 		failure(w, 500, "Unable to load problems", err)
 		return
