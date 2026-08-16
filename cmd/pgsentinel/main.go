@@ -39,7 +39,11 @@ func main() {
 	defer stop()
 	manager := collector.NewManager(store, log, cfg.StatsInterval)
 	go manager.Run(ctx)
-	authentication := auth.New(auth.Config{Password: cfg.AdminPassword, SecureCookies: cfg.SecureCookies})
+	authentication, err := auth.New(auth.Config{Password: cfg.AdminPassword, SecureCookies: cfg.SecureCookies, TrustedProxies: cfg.TrustedProxyCIDRs})
+	if err != nil {
+		log.Error("configure authentication", "error", err)
+		os.Exit(1)
+	}
 	app := api.New(store, log, api.Options{
 		Auth:               authentication,
 		NotificationPolicy: notifications.NewTargetPolicy(cfg.AllowPrivateNotificationTargets, cfg.NotificationAllowedHosts),

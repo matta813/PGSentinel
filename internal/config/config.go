@@ -18,6 +18,7 @@ type Config struct {
 	SecureCookies                   bool
 	AllowPrivateNotificationTargets bool
 	NotificationAllowedHosts        []string
+	TrustedProxyCIDRs               []string
 	LogLevel                        string
 	FastInterval                    time.Duration
 	StatsInterval                   time.Duration
@@ -35,6 +36,7 @@ func Load() (Config, error) {
 		EncryptionKey: os.Getenv("PGSENTINEL_ENCRYPTION_KEY"), AdminPassword: os.Getenv("PGSENTINEL_ADMIN_PASSWORD"), LogLevel: env("PGSENTINEL_LOG_LEVEL", "info"),
 		SecureCookies: boolean("PGSENTINEL_SECURE_COOKIES", false), AllowPrivateNotificationTargets: boolean("PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS", false),
 		NotificationAllowedHosts: list("PGSENTINEL_NOTIFICATION_ALLOWED_HOSTS"),
+		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
 		FastInterval:             duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
 		SlowInterval: duration("PGSENTINEL_SLOW_INTERVAL", 5*time.Minute), MetaInterval: duration("PGSENTINEL_META_INTERVAL", 30*time.Minute),
 		Retention:   duration("PGSENTINEL_RETENTION", 30*24*time.Hour),

@@ -75,6 +75,14 @@ To restore, stop the service, copy the database back, and start it again. Preser
 
 PGSentinel requires an administrator login and rate-limits failed attempts. Put it behind HTTPS and set `PGSENTINEL_SECURE_COOKIES=true`; network-level access control remains recommended.
 
+Sessions are intentionally held in memory for this single-instance release. Restarting PGSentinel signs every administrator out, and multiple replicas do not share sessions. When a reverse proxy connects to PGSentinel, configure only its exact network ranges so login limits apply to the originating client instead of the proxy:
+
+```bash
+export PGSENTINEL_TRUSTED_PROXY_CIDRS=172.18.0.0/16
+```
+
+PGSentinel ignores `X-Forwarded-For` from every source outside those CIDRs. Do not use a broad trusted range when untrusted workloads can connect from it.
+
 Notification delivery blocks loopback, private, link-local, carrier-grade NAT, multicast and metadata destinations by default. DNS is checked at connection time and again after redirects to prevent DNS rebinding. For a self-hosted ntfy or webhook service, prefer an exact allowlist:
 
 ```bash

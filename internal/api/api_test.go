@@ -22,7 +22,10 @@ func testAPI(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	manager := auth.New(auth.Config{Password: "a-secure-test-password"})
+	manager, err := auth.New(auth.Config{Password: "a-secure-test-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	handler := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{Auth: manager}).Handler()
 	capture := httptest.NewRecorder()
 	if err := manager.Start(capture); err != nil {
@@ -43,7 +46,10 @@ func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	manager := auth.New(auth.Config{Password: "a-secure-test-password"})
+	manager, err := auth.New(auth.Config{Password: "a-secure-test-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	handler := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{Auth: manager}).Handler()
 
 	r := httptest.NewRecorder()
@@ -70,6 +76,13 @@ func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
 	handler.ServeHTTP(r, req)
 	if r.Code != http.StatusOK {
 		t.Fatalf("logout=%d", r.Code)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
+	req.AddCookie(cookie)
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, req)
+	if r.Code != http.StatusUnauthorized {
+		t.Fatalf("logged-out session=%d", r.Code)
 	}
 }
 func TestHealthAndServerAPI(t *testing.T) {

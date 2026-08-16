@@ -5,20 +5,27 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
+	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/argon2"
 )
 
 const CookieName = "pgsentinel_session"
 
 type Config struct {
-	Password      string
-	SecureCookies bool
-	SessionTTL    time.Duration
-	MaxAttempts   int
-	AttemptWindow time.Duration
+	Password       string
+	SecureCookies  bool
+	SessionTTL     time.Duration
+	MaxAttempts    int
+	AttemptWindow  time.Duration
+	MaxClients     int
+	TrustedProxies []string
 }
 
 type attemptWindow struct {
@@ -27,11 +34,15 @@ type attemptWindow struct {
 }
 
 type Manager struct {
-	passwordHash [sha256.Size]byte
-	secure       bool
-	ttl          time.Duration
-	maxAttempts  int
-	window       time.Duration
+	passwordHash   []byte
+	passwordSalt   []byte
+	secure         bool
+	ttl            time.Duration
+	maxAttempts    int
+	window         time.Duration
+	maxClients     int
+	trustedProxies []netip.Prefix
+	passwordSlots  chan struct{}
 
 	mu       sync.Mutex
 	sessions map[[sha256.Size]byte]time.Time
@@ -39,7 +50,7 @@ type Manager struct {
 	now      func() time.Time
 }
 
-func New(cfg Config) *Manager {
+func New(cfg Config) (*Manager, error) {
 	if cfg.SessionTTL <= 0 {
 		cfg.SessionTTL = 12 * time.Hour
 	}
@@ -49,23 +60,44 @@ func New(cfg Config) *Manager {
 	if cfg.AttemptWindow <= 0 {
 		cfg.AttemptWindow = 5 * time.Minute
 	}
-	return &Manager{
-		passwordHash: sha256.Sum256([]byte(cfg.Password)), secure: cfg.SecureCookies,
-		ttl: cfg.SessionTTL, maxAttempts: cfg.MaxAttempts, window: cfg.AttemptWindow,
-		sessions: map[[sha256.Size]byte]time.Time{}, attempts: map[string]attemptWindow{}, now: time.Now,
+	if cfg.MaxClients <= 0 {
+		cfg.MaxClients = 10_000
 	}
+	trusted := make([]netip.Prefix, 0, len(cfg.TrustedProxies))
+	for _, raw := range cfg.TrustedProxies {
+		prefix, err := netip.ParsePrefix(strings.TrimSpace(raw))
+		if err != nil {
+			return nil, fmt.Errorf("invalid trusted proxy CIDR %q: %w", raw, err)
+		}
+		trusted = append(trusted, prefix.Masked())
+	}
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, fmt.Errorf("generate password salt: %w", err)
+	}
+	return &Manager{
+		passwordHash: derivePassword(cfg.Password, salt), passwordSalt: salt, secure: cfg.SecureCookies,
+		ttl: cfg.SessionTTL, maxAttempts: cfg.MaxAttempts, window: cfg.AttemptWindow, maxClients: cfg.MaxClients, trustedProxies: trusted,
+		passwordSlots: make(chan struct{}, 2), sessions: map[[sha256.Size]byte]time.Time{}, attempts: map[string]attemptWindow{}, now: time.Now,
+	}, nil
 }
 
 func (m *Manager) CheckPassword(password string) bool {
-	candidate := sha256.Sum256([]byte(password))
-	return subtle.ConstantTimeCompare(candidate[:], m.passwordHash[:]) == 1
+	m.passwordSlots <- struct{}{}
+	defer func() { <-m.passwordSlots }()
+	candidate := derivePassword(password, m.passwordSalt)
+	return subtle.ConstantTimeCompare(candidate, m.passwordHash) == 1
 }
 
-func (m *Manager) AllowAttempt(remoteAddr string) bool {
-	key := clientAddress(remoteAddr)
+func (m *Manager) AllowAttempt(r *http.Request) bool {
+	key := m.clientAddress(r)
 	now := m.now()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.pruneAttemptsLocked(now)
+	if _, exists := m.attempts[key]; !exists && len(m.attempts) >= m.maxClients {
+		key = "__overflow__"
+	}
 	entry := m.attempts[key]
 	if entry.started.IsZero() || now.Sub(entry.started) >= m.window {
 		entry = attemptWindow{started: now}
@@ -78,9 +110,9 @@ func (m *Manager) AllowAttempt(remoteAddr string) bool {
 	return true
 }
 
-func (m *Manager) ResetAttempts(remoteAddr string) {
+func (m *Manager) ResetAttempts(r *http.Request) {
 	m.mu.Lock()
-	delete(m.attempts, clientAddress(remoteAddr))
+	delete(m.attempts, m.clientAddress(r))
 	m.mu.Unlock()
 }
 
@@ -132,10 +164,50 @@ func (m *Manager) pruneLocked() {
 	}
 }
 
-func clientAddress(remoteAddr string) string {
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err == nil {
-		return host
+func (m *Manager) pruneAttemptsLocked(now time.Time) {
+	for address, entry := range m.attempts {
+		if now.Sub(entry.started) >= m.window {
+			delete(m.attempts, address)
+		}
 	}
-	return remoteAddr
+}
+
+func (m *Manager) clientAddress(r *http.Request) string {
+	peer := parseAddress(r.RemoteAddr)
+	if !m.isTrustedProxy(peer) {
+		return peer.String()
+	}
+	forwarded := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+	for i := len(forwarded) - 1; i >= 0; i-- {
+		candidate, err := netip.ParseAddr(strings.TrimSpace(forwarded[i]))
+		if err != nil {
+			continue
+		}
+		candidate = candidate.Unmap()
+		if !m.isTrustedProxy(candidate) {
+			return candidate.String()
+		}
+	}
+	return peer.String()
+}
+
+func (m *Manager) isTrustedProxy(address netip.Addr) bool {
+	for _, prefix := range m.trustedProxies {
+		if prefix.Contains(address) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseAddress(remote string) netip.Addr {
+	if host, _, err := net.SplitHostPort(remote); err == nil {
+		remote = host
+	}
+	address, _ := netip.ParseAddr(remote)
+	return address.Unmap()
+}
+
+func derivePassword(password string, salt []byte) []byte {
+	return argon2.IDKey([]byte(password), salt, 3, 64*1024, 2, 32)
 }

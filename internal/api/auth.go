@@ -28,7 +28,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		failure(w, http.StatusServiceUnavailable, "Authentication is not configured", nil)
 		return
 	}
-	if !a.auth.AllowAttempt(r.RemoteAddr) {
+	if !a.auth.AllowAttempt(r) {
 		failure(w, http.StatusTooManyRequests, "Too many login attempts; try again later", nil)
 		return
 	}
@@ -40,7 +40,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		failure(w, http.StatusUnauthorized, "Invalid credentials", nil)
 		return
 	}
-	a.auth.ResetAttempts(r.RemoteAddr)
+	a.auth.ResetAttempts(r)
 	if err := a.auth.Start(w); err != nil {
 		a.log.Error("create session", "error", err)
 		failure(w, http.StatusInternalServerError, "Unable to create session", nil)

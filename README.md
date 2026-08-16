@@ -93,6 +93,7 @@ After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and e
 | `PGSENTINEL_STATS_INTERVAL` | `30s` | Monitoring cycle interval |
 | `PGSENTINEL_RETENTION` | `720h` | Configured retention horizon |
 | `PGSENTINEL_LOG_LEVEL` | `info` | `info` or `debug` structured JSON logging |
+| `PGSENTINEL_TRUSTED_PROXY_CIDRS` | empty | Exact reverse-proxy CIDRs allowed to supply `X-Forwarded-For` |
 
 Passwords, tokens, and full connection URLs are never logged or returned by normal APIs. Normalized `pg_stat_statements.query` text can still contain literals for statements that PostgreSQL cannot normalize; treat database access as sensitive.
 
