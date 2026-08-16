@@ -18,7 +18,7 @@ Never rotate or lose this value without first implementing a credential re-encry
 The repository Compose file pins the stable application version while allowing an explicit override:
 
 ```bash
-export PGSENTINEL_VERSION=0.1.1
+export PGSENTINEL_VERSION=0.2.0
 export PGSENTINEL_ENCRYPTION_KEY='value-from-your-secret-store'
 export PGSENTINEL_ADMIN_PASSWORD='value-from-your-secret-store'
 docker compose pull

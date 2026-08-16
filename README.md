@@ -39,7 +39,7 @@ Minimal deployment:
 ```yaml
 services:
   pgsentinel:
-    image: ghcr.io/matta813/pgsentinel:0.1.1
+    image: ghcr.io/matta813/pgsentinel:0.2.0
     container_name: pgsentinel
     restart: unless-stopped
     read_only: true
@@ -56,7 +56,7 @@ services:
 
 The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity. Keep the encryption key stable—losing it makes stored credentials unrecoverable.
 
-The repository Compose file defaults to the pinned `0.1.1` image. Set `PGSENTINEL_VERSION` to choose another release. Local source builds use the explicit development override:
+The repository Compose file defaults to the pinned `0.2.0` image. Set `PGSENTINEL_VERSION` to choose another release. Local source builds use the explicit development override:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
@@ -115,7 +115,7 @@ After lint, tests and builds pass, GitHub Actions exclusively for that version c
 Pin production deployments to a version:
 
 ```bash
-docker pull ghcr.io/matta813/pgsentinel:0.1.1
+docker pull ghcr.io/matta813/pgsentinel:0.2.0
 ```
 
 `latest` is convenient for evaluation but moves on every stable release. See [release workflow, permissions, and troubleshooting](docs/releases.md).
