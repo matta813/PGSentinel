@@ -15,7 +15,13 @@ Never rotate or lose this value without first implementing a credential re-encry
 
 ## Start with Docker Compose
 
-The repository Compose file pins the stable application version while allowing an explicit override:
+For a ready-to-run local installation, use the reviewed installer from the canonical repository. It creates `pgsentinel/.env` with unique secrets, downloads the pinned Quickstart Compose file, preserves existing credentials on later runs, pulls the image, and waits for the service health check:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh | sh
+```
+
+Inspect the [Quickstart Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml) and [installer](https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh) before execution when required by local supply-chain policy. The repository Compose file remains available for manually managed deployments and allows an explicit version override:
 
 ```bash
 export PGSENTINEL_VERSION=0.2.0
@@ -29,6 +35,10 @@ curl --fail http://127.0.0.1:8080/ready
 ```
 
 Open `http://localhost:8080` and add an existing PostgreSQL target under **Servers**. Across Docker networks, use a DNS name or IP reachable from the PGSentinel container; `localhost` inside the container refers to PGSentinel itself.
+
+If an installer run is interrupted, run the same command again. The existing `.env` is retained. To recover the generated administrator password locally, read `PGSENTINEL_ADMIN_PASSWORD` from that protected file; never paste it into an issue or log.
+
+The generated `pgsentinel/.env` defaults to host port `8080` and timezone `UTC`. Edit `PGSENTINEL_PORT` or `TZ` there before recreating the service if different values are required. Set `PGSENTINEL_SECURE_COOKIES=true` when the browser reaches PGSentinel exclusively through HTTPS. The Quickstart uses the named volume `pgsentinel-data`; removing the container does not remove that volume, but `docker compose down --volumes` does.
 
 ## Version pinning and upgrades
 

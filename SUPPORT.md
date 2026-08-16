@@ -1,6 +1,6 @@
 # Support
 
-Use [GitHub Discussions](https://github.com/matta813/pgsentinel/discussions) for installation help, configuration questions, and operational troubleshooting. Include the PGSentinel and PostgreSQL versions, deployment method, expected behavior, and redacted logs.
+Use [GitHub Discussions](https://github.com/matta813/PGSentinel/discussions) for installation help, configuration questions, and operational troubleshooting. Include the PGSentinel and PostgreSQL versions, deployment method, expected behavior, and redacted logs.
 
 Use an issue only for a reproducible bug or an actionable feature proposal. Security vulnerabilities must be reported privately according to [SECURITY.md](SECURITY.md).
 
