@@ -61,7 +61,7 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 	if filter.Status == "all" {
 		filter.Status = ""
 	}
-	if filter.Status != "" && filter.Status != "active" && filter.Status != "resolved" {
+	if filter.Status != "" && filter.Status != "active" && filter.Status != "acknowledged" && filter.Status != "resolved" {
 		failure(w, 422, "Unsupported problem status", nil)
 		return
 	}
