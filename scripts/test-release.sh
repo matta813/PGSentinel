@@ -19,12 +19,17 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 release_version=$(cat "$repo_root/RELEASE")
 compose_version=$(sed -n 's/.*PGSENTINEL_VERSION:-\([^}]*\)}.*/\1/p' "$repo_root/docker-compose.yml")
 example_version=$(sed -n 's/^PGSENTINEL_VERSION=//p' "$repo_root/.env.example")
+quickstart_version=$(sed -n 's/^[[:space:]]*image: ghcr.io\/matta813\/pgsentinel:\([^[:space:]]*\).*/\1/p' "$repo_root/docker-compose.quickstart.yml")
 if [ "$compose_version" != "$release_version" ]; then
   echo "docker-compose.yml version $compose_version does not match RELEASE $release_version"
   failures=$((failures+1))
 fi
 if [ "$example_version" != "$release_version" ]; then
   echo ".env.example version $example_version does not match RELEASE $release_version"
+  failures=$((failures+1))
+fi
+if [ "$quickstart_version" != "$release_version" ]; then
+  echo "docker-compose.quickstart.yml version $quickstart_version does not match RELEASE $release_version"
   failures=$((failures+1))
 fi
 [ "$failures" -eq 0 ] || exit 1

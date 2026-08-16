@@ -25,14 +25,24 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 
 ## Quick start
 
+Install Docker with the Compose v2 plugin, then run:
+
 ```bash
-export PGSENTINEL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
-export PGSENTINEL_ADMIN_PASSWORD="replace-with-a-long-random-password"
-docker compose pull
-docker compose up -d
+curl -fsSL https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh | sh
 ```
 
-Open <http://localhost:8080>, then add an existing PostgreSQL server under **Servers**. The Compose stack starts only PGSentinel and does not provision or modify a PostgreSQL instance.
+The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, and starts it. It prints the generated administrator password once. Open <http://localhost:8080>, sign in, then add an existing PostgreSQL server under **Servers**.
+
+To inspect the files before starting instead:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml
+curl -fsSLO https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh
+less install-compose.sh
+sh install-compose.sh
+```
+
+The Compose stack starts only PGSentinel and does not provision or modify a PostgreSQL instance. Keep the generated `.env` file private and backed up: losing its encryption key makes stored PostgreSQL credentials unrecoverable.
 
 Minimal deployment:
 
@@ -54,7 +64,7 @@ services:
       PGSENTINEL_ADMIN_PASSWORD: "replace-with-a-long-random-password"
 ```
 
-The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity. Keep the encryption key stable—losing it makes stored credentials unrecoverable.
+The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity.
 
 The repository Compose file defaults to the pinned `0.2.0` image. Set `PGSENTINEL_VERSION` to choose another release. Local source builds use the explicit development override:
 
