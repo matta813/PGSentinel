@@ -120,10 +120,21 @@ jobs:
           fetch-depth: 0
       - name: Generate release notes
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
         run: |
           previous_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
-          ./scripts/release-notes.sh "$VERSION" "$previous_tag" > release-notes.md
+          if [ -n "$previous_tag" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" -f previous_tag_name="$previous_tag" \
+              --jq .body > generated-notes.md
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
+              --jq .body > generated-notes.md
+          fi
+          ./scripts/release-notes.sh "$VERSION" generated-notes.md > release-notes.md
       - name: Create or repair GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

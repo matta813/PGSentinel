@@ -23,6 +23,12 @@ The `CI` workflow runs Go and frontend lint, tests, and production builds for `m
 
 Publication order is verification, image build, version image push, `v` image push, optional `latest` push, then GitHub release/tag creation from the exact commit SHA. A recovery dispatch may safely repush image tags and repairs an existing release record instead of creating a duplicate. Normal release validation rejects an existing tag before expensive work.
 
+## Release notes
+
+The release workflow asks GitHub to generate notes for the exact range between the previous tag and the new release commit. This supplies authoritative pull request links, authors, the full comparison link, and a `New Contributors` section whenever GitHub identifies a contributor's first merged pull request.
+
+PGSentinel then formats those entries into a Jellyfin-inspired release page with a launch heading, upgrade reminder, counted changelog, and emoji categories. Conventional pull request titles such as `feat:`, `fix(security):`, `perf:`, `docs:`, and `chore(deps):` determine the category; unmatched titles appear under General Changes. Apply the `skip-changelog` label before merging a pull request that should not appear in release notes.
+
 ## Image tags
 
 Stable `0.4.2` produces `ghcr.io/matta813/pgsentinel:0.4.2`, `:v0.4.2`, and `:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
