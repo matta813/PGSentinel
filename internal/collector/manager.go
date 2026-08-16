@@ -13,7 +13,7 @@ import (
 )
 
 type Schedule struct {
-	Fast, Standard, Slow, Metadata time.Duration
+	Fast, Standard, Slow, Metadata, Retention time.Duration
 }
 
 type collectionCycle uint8
@@ -51,6 +51,9 @@ func (s Schedule) normalized() Schedule {
 	if s.Metadata <= 0 {
 		s.Metadata = 30 * time.Minute
 	}
+	if s.Retention <= 0 {
+		s.Retention = 30 * 24 * time.Hour
+	}
 	return s
 }
 
@@ -81,9 +84,15 @@ func (m *Manager) Run(ctx context.Context) {
 		case <-metadata.C:
 			m.collectAll(ctx, cycleMetadata)
 		case <-prune.C:
-			_ = m.store.Prune(ctx, time.Now().Add(-30*24*time.Hour))
+			if err := m.prune(ctx, time.Now()); err != nil {
+				m.log.Warn("prune monitoring history", "error", err)
+			}
 		}
 	}
+}
+
+func (m *Manager) prune(ctx context.Context, now time.Time) error {
+	return m.store.Prune(ctx, now.Add(-m.schedule.Retention))
 }
 
 func (m *Manager) collectAll(ctx context.Context, cycle collectionCycle) {
@@ -122,7 +131,6 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		m.log.Debug("waiting for initial core snapshot", "server_id", server.ID)
 		return
 	}
-
 	if cycle&cycleStandard != 0 {
 		queries, available, queryErr := collector.CollectQueries(ctx)
 		snapshot.Capabilities["pg_stat_statements"] = available
@@ -156,6 +164,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	}
 	if coreFresh {
 		_ = m.store.SaveSnapshot(ctx, server.ID, "core", snapshot, snapshot.CollectedAt)
+		_ = m.store.SaveMetrics(ctx, snapshotMetrics(snapshot))
 	}
 	if cycle == cycleMetadata {
 		m.log.Info("metadata collection complete", "server_id", server.ID)
@@ -166,4 +175,19 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	_ = m.store.UpsertFindings(ctx, server.ID, findings)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, "healthy", snapshot.Version, "", true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func snapshotMetrics(s models.Snapshot) []models.Metric {
+	values := map[string]float64{
+		"connections.active":      float64(s.Connections.Active),
+		"connections.total":       float64(s.Connections.Total),
+		"connections.utilization": s.Connections.Utilization,
+		"connections.waiting":     float64(s.Connections.Waiting),
+		"server.uptime_seconds":   s.UptimeSeconds,
+	}
+	out := make([]models.Metric, 0, len(values))
+	for name, value := range values {
+		out = append(out, models.Metric{ServerID: s.ServerID, Name: name, Value: value, CollectedAt: s.CollectedAt})
+	}
+	return out
 }

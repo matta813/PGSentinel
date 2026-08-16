@@ -56,6 +56,50 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 	v.Password = ""
 	write(w, 201, v)
 }
+func (a *API) updateServer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		failure(w, 400, "Invalid server ID", nil)
+		return
+	}
+	var v models.Server
+	if !decode(w, r, &v) {
+		return
+	}
+	v.ID = id
+	v.Name = strings.TrimSpace(v.Name)
+	v.Host = strings.TrimSpace(v.Host)
+	v.User = strings.TrimSpace(v.User)
+	if v.Name == "" || v.Host == "" || v.User == "" {
+		failure(w, 422, "Name, host and user are required", nil)
+		return
+	}
+	if v.Port == 0 {
+		v.Port = 5432
+	}
+	if v.SSLMode == "" {
+		v.SSLMode = "prefer"
+	}
+	switch v.SSLMode {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+	default:
+		failure(w, 422, "Unsupported SSL mode", nil)
+		return
+	}
+	if err := a.store.UpdateServer(r.Context(), &v); err == sql.ErrNoRows {
+		failure(w, 404, "Server not found", nil)
+		return
+	} else if err != nil {
+		failure(w, 409, "Unable to update PostgreSQL server", err)
+		return
+	}
+	updated, err := a.store.GetServer(r.Context(), id, false)
+	if err != nil {
+		failure(w, 500, "Unable to load updated server", err)
+		return
+	}
+	write(w, 200, updated)
+}
 func (a *API) getServer(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !validID(id) {

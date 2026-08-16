@@ -11,6 +11,8 @@ make backend
 
 In another terminal, `make frontend`; Vite proxies API requests to port 8080. `make test`, `make lint`, and `make build` mirror CI. Docker integration is `make docker-up`.
 
+`PGSENTINEL_RETENTION` controls raw snapshot retention and is applied by the hourly pruning task. Use a Go duration such as `168h` or `720h`; findings and server configuration are not removed by snapshot retention.
+
 Add migrations as ordered files under `migrations/`. Rules should be deterministic, return actionable evidence, state uncertainty, and include unit tests at threshold boundaries. Collector queries must be read-only, bounded, version-aware for PostgreSQL 15+, and avoid large unbounded result sets. Never log a server object containing its decrypted password.
 
 ## Collector schedules
