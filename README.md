@@ -18,7 +18,7 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 - Stable problem fingerprints with active, resolved and reopened lifecycle
 - Evidence-driven rules, confidence, weighted server health and category scores
 - Duplicate/unused index candidates; no automatic destructive database changes
-- ntfy and generic webhook delivery tests
+- encrypted ntfy and generic webhook destinations with delivery tests
 - Responsive professional light/dark React interface
 - SQLite WAL storage, migrations and 30-day raw snapshot retention
 - One production container, health/readiness endpoints and GitHub Actions CI
@@ -147,7 +147,7 @@ See the [documentation index](docs/README.md), [architecture](docs/architecture.
 
 ## API
 
-Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, metrics, queries, tables, indexes, locks, vacuum, configuration, and notification testing. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
+Versioned endpoints live under `/api/v1`: servers and connection tests, overview, problems, historical core metrics, queries, tables, indexes, locks, vacuum, configuration, notification destination CRUD, and notification testing. Metric history is available at `GET /api/v1/servers/{id}/metric-history?name=connections.total`; optional `from` and `limit` parameters constrain the series. Operational APIs require an authenticated administrator session. `GET /health`, `GET /ready`, and `GET /api/v1/version` remain public for probes and inventory.
 
 ## Roadmap and limitations
 

@@ -7,7 +7,7 @@ CREATE ROLE pgsentinel LOGIN PASSWORD 'replace-me';
 GRANT pg_monitor TO pgsentinel;
 ```
 
-`pg_monitor` exposes server statistics, settings and session activity without superuser. Configure a narrow `pg_hba.conf` source range and TLS (`verify-full` where certificates permit). Rotate the password through the server form when credential update support lands; for the current release delete/re-add the target.
+`pg_monitor` exposes server statistics, settings and session activity without superuser. Configure a narrow `pg_hba.conf` source range and TLS (`verify-full` where certificates permit). Use **Edit** on the Servers page to rotate a password without deleting the monitoring target; leave the password field empty to retain the current credential.
 
 For query statistics, add `pg_stat_statements` to `shared_preload_libraries`, restart PostgreSQL, then run `CREATE EXTENSION pg_stat_statements` in each monitored database. pgsentinel does not need ownership of application objects and does not run VACUUM, CREATE/DROP INDEX, terminate backends, reset statistics, or change settings.
 
