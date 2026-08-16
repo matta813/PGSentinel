@@ -14,5 +14,18 @@ assert_compare 1.0.0-rc.2 1.0.0-rc.1 1
 assert_compare 1.0.0-beta.2 1.0.0-rc.1 -1
 if is_prerelease 1.0.0; then echo "stable classified as prerelease"; failures=$((failures+1)); fi
 if ! is_prerelease 1.0.0-rc.1; then echo "prerelease classified as stable"; failures=$((failures+1)); fi
+
+repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+release_version=$(cat "$repo_root/RELEASE")
+compose_version=$(sed -n 's/.*PGSENTINEL_VERSION:-\([^}]*\)}.*/\1/p' "$repo_root/docker-compose.yml")
+example_version=$(sed -n 's/^PGSENTINEL_VERSION=//p' "$repo_root/.env.example")
+if [ "$compose_version" != "$release_version" ]; then
+  echo "docker-compose.yml version $compose_version does not match RELEASE $release_version"
+  failures=$((failures+1))
+fi
+if [ "$example_version" != "$release_version" ]; then
+  echo ".env.example version $example_version does not match RELEASE $release_version"
+  failures=$((failures+1))
+fi
 [ "$failures" -eq 0 ] || exit 1
 echo "release logic tests passed"
