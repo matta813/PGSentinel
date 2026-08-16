@@ -19,6 +19,7 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 - Evidence-driven rules, confidence, weighted server health and category scores
 - Duplicate/unused index candidates; no automatic destructive database changes
 - encrypted ntfy and generic webhook destinations with delivery tests
+- low-cardinality Prometheus metrics for service and PostgreSQL health
 - Responsive professional light/dark React interface
 - SQLite WAL storage, migrations and 30-day raw snapshot retention
 - One production container, health/readiness endpoints and GitHub Actions CI
