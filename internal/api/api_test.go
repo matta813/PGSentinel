@@ -129,6 +129,28 @@ func TestRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestMetricHistoryValidation(t *testing.T) {
+	h := testAPI(t)
+	serverID := "1b5c3f33-bfcb-4fd4-9c36-df76e2683ee5"
+	for _, path := range []string{
+		"/api/v1/servers/not-a-uuid/metric-history?name=connections.total",
+		"/api/v1/servers/" + serverID + "/metric-history?name=unknown",
+		"/api/v1/servers/" + serverID + "/metric-history?name=connections.total&limit=1001",
+		"/api/v1/servers/" + serverID + "/metric-history?name=connections.total&from=yesterday",
+	} {
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, path, nil))
+		if r.Code != http.StatusBadRequest && r.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("%s returned %d: %s", path, r.Code, r.Body.String())
+		}
+	}
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/servers/"+serverID+"/metric-history?name=connections.total", nil))
+	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != "[]" {
+		t.Fatalf("empty history=%d %s", r.Code, r.Body.String())
+	}
+}
+
 func TestFrontendDoesNotServeFilesOutsideRoot(t *testing.T) {
 	parent := t.TempDir()
 	root := filepath.Join(parent, "web")
