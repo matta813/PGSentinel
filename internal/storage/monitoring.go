@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/matta813/pgsentinel/internal/models"
+	"strings"
 	"time"
 )
 
@@ -64,16 +65,37 @@ func (s *Store) UpsertFindings(ctx context.Context, serverID string, findings []
 	}
 	return tx.Commit()
 }
+
+type FindingFilter struct {
+	Status, ServerID, Severity, Category, Search string
+}
+
 func (s *Store) ListFindings(ctx context.Context, status, serverID string) ([]models.Finding, error) {
+	return s.FilterFindings(ctx, FindingFilter{Status: status, ServerID: serverID})
+}
+
+func (s *Store) FilterFindings(ctx context.Context, filter FindingFilter) ([]models.Finding, error) {
 	q := `SELECT id,rule_id,fingerprint,server_id,database_name,resource,severity,category,title,summary,cause,impact,evidence_json,suggestions_json,confidence,status,started_at,updated_at,resolved_at FROM findings WHERE 1=1`
 	args := []any{}
-	if status != "" {
+	if filter.Status != "" {
 		q += " AND status=?"
-		args = append(args, status)
+		args = append(args, filter.Status)
 	}
-	if serverID != "" {
+	if filter.ServerID != "" {
 		q += " AND server_id=?"
-		args = append(args, serverID)
+		args = append(args, filter.ServerID)
+	}
+	if filter.Severity != "" {
+		q += " AND severity=?"
+		args = append(args, filter.Severity)
+	}
+	if filter.Category != "" {
+		q += " AND LOWER(category)=LOWER(?)"
+		args = append(args, filter.Category)
+	}
+	if filter.Search != "" {
+		q += " AND LOWER(title || ' ' || summary || ' ' || cause || ' ' || impact || ' ' || database_name || ' ' || resource) LIKE ?"
+		args = append(args, "%"+strings.ToLower(filter.Search)+"%")
 	}
 	q += " ORDER BY CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'LOW' THEN 3 ELSE 4 END, updated_at DESC"
 	rows, err := s.DB.QueryContext(ctx, q, args...)
@@ -102,6 +124,17 @@ func (s *Store) ListFindings(ctx context.Context, status, serverID string) ([]mo
 	return out, rows.Err()
 }
 func (s *Store) Prune(ctx context.Context, before time.Time) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM snapshots WHERE collected_at < ?`, before.Format(time.RFC3339Nano))
-	return err
+	cutoff := before.Format(time.RFC3339Nano)
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM snapshots WHERE collected_at < ?`, cutoff); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM metrics WHERE collected_at < ?`, cutoff); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

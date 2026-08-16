@@ -74,6 +74,15 @@ type Metric struct {
 	Labels      map[string]string `json:"labels,omitempty"`
 	CollectedAt time.Time         `json:"collectedAt"`
 }
+type NotificationDestination struct {
+	ID        string            `json:"id"`
+	Provider  string            `json:"provider"`
+	Name      string            `json:"name"`
+	Config    map[string]string `json:"-"`
+	Enabled   bool              `json:"enabled"`
+	CreatedAt time.Time         `json:"createdAt"`
+	UpdatedAt time.Time         `json:"updatedAt"`
+}
 type Snapshot struct {
 	ServerID      string            `json:"serverId"`
 	CollectedAt   time.Time         `json:"collectedAt"`

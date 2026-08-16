@@ -6,6 +6,7 @@ import (
 	"github.com/matta813/pgsentinel/internal/models"
 	pg "github.com/matta813/pgsentinel/internal/postgres"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -22,6 +23,15 @@ func (a *API) listServers(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to load servers", err)
 		return
 	}
+	if tag := strings.TrimSpace(r.URL.Query().Get("tag")); tag != "" {
+		filtered := make([]models.Server, 0, len(v))
+		for _, server := range v {
+			if containsTag(server.Tags, tag) {
+				filtered = append(filtered, server)
+			}
+		}
+		v = filtered
+	}
 	write(w, 200, v)
 }
 func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +42,7 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 	v.Name = strings.TrimSpace(v.Name)
 	v.Host = strings.TrimSpace(v.Host)
 	v.User = strings.TrimSpace(v.User)
+	v.Tags = normalizeTags(v.Tags)
 	if v.Name == "" || v.Host == "" || v.User == "" || v.Password == "" {
 		failure(w, 422, "Name, host, user and password are required", nil)
 		return
@@ -55,6 +66,76 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Password = ""
 	write(w, 201, v)
+}
+func normalizeTags(tags []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		key := strings.ToLower(tag)
+		if tag == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, tag)
+	}
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i]) < strings.ToLower(out[j]) })
+	return out
+}
+
+func containsTag(tags []string, want string) bool {
+	for _, tag := range tags {
+		if strings.EqualFold(tag, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *API) updateServer(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		failure(w, 400, "Invalid server ID", nil)
+		return
+	}
+	var v models.Server
+	if !decode(w, r, &v) {
+		return
+	}
+	v.ID = id
+	v.Name = strings.TrimSpace(v.Name)
+	v.Host = strings.TrimSpace(v.Host)
+	v.User = strings.TrimSpace(v.User)
+	v.Tags = normalizeTags(v.Tags)
+	if v.Name == "" || v.Host == "" || v.User == "" {
+		failure(w, 422, "Name, host and user are required", nil)
+		return
+	}
+	if v.Port == 0 {
+		v.Port = 5432
+	}
+	if v.SSLMode == "" {
+		v.SSLMode = "prefer"
+	}
+	switch v.SSLMode {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+	default:
+		failure(w, 422, "Unsupported SSL mode", nil)
+		return
+	}
+	if err := a.store.UpdateServer(r.Context(), &v); err == sql.ErrNoRows {
+		failure(w, 404, "Server not found", nil)
+		return
+	} else if err != nil {
+		failure(w, 409, "Unable to update PostgreSQL server", err)
+		return
+	}
+	updated, err := a.store.GetServer(r.Context(), id, false)
+	if err != nil {
+		failure(w, 500, "Unable to load updated server", err)
+		return
+	}
+	write(w, 200, updated)
 }
 func (a *API) getServer(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
