@@ -1,0 +1,20 @@
+services:
+  pgsentinel:
+    image: ghcr.io/matta813/pgsentinel:0.2.0
+    container_name: pgsentinel
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:rw,noexec,nosuid,nodev,size=64m]
+    ports: ["${PGSENTINEL_PORT:-8080}:8080"]
+    environment:
+      TZ: ${TZ:-UTC}
+      PGSENTINEL_ENCRYPTION_KEY: ${PGSENTINEL_ENCRYPTION_KEY:?run the PGSentinel installer to generate .env}
+      PGSENTINEL_ADMIN_PASSWORD: ${PGSENTINEL_ADMIN_PASSWORD:?run the PGSentinel installer to generate .env}
+      PGSENTINEL_SECURE_COOKIES: ${PGSENTINEL_SECURE_COOKIES:-false}
+      PGSENTINEL_STATS_INTERVAL: ${PGSENTINEL_STATS_INTERVAL:-30s}
+    volumes: [pgsentinel-data:/data]
+
+volumes:
+  pgsentinel-data:
