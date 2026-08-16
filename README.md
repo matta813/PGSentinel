@@ -28,16 +28,16 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 Install Docker with the Compose v2 plugin, then run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/matta813/pgsentinel/main/scripts/install-compose.sh | sh
+curl -fsSL https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh | sh
 ```
 
-The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/pgsentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, and starts it. It prints the generated administrator password once. Open <http://localhost:8080>, sign in, then add an existing PostgreSQL server under **Servers**.
+The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, and starts it. It prints the generated administrator password once. Open <http://localhost:8080>, sign in, then add an existing PostgreSQL server under **Servers**.
 
 To inspect the files before starting instead:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/matta813/pgsentinel/main/docker-compose.quickstart.yml
-curl -fsSLO https://raw.githubusercontent.com/matta813/pgsentinel/main/scripts/install-compose.sh
+curl -fsSLO https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml
+curl -fsSLO https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh
 less install-compose.sh
 sh install-compose.sh
 ```

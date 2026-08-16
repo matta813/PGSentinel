@@ -2,7 +2,7 @@
 set -eu
 
 install_dir=${PGSENTINEL_INSTALL_DIR:-pgsentinel}
-compose_url=https://raw.githubusercontent.com/matta813/pgsentinel/main/docker-compose.quickstart.yml
+compose_url=https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml
 
 command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
