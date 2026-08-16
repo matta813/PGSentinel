@@ -1,10 +1,10 @@
 # PGSentinel
 
-[![CI](https://github.com/matta813/pgsentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/matta813/pgsentinel/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/matta813/pgsentinel/actions/workflows/codeql.yml/badge.svg)](https://github.com/matta813/pgsentinel/actions/workflows/codeql.yml)
-[![GitHub release](https://img.shields.io/github/v/release/matta813/pgsentinel)](https://github.com/matta813/pgsentinel/releases)
+[![CI](https://github.com/matta813/PGSentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/matta813/PGSentinel/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/matta813/PGSentinel/actions/workflows/codeql.yml/badge.svg)](https://github.com/matta813/PGSentinel/actions/workflows/codeql.yml)
+[![GitHub release](https://img.shields.io/github/v/release/matta813/pgsentinel)](https://github.com/matta813/PGSentinel/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/matta813/pgsentinel/badge)](https://scorecard.dev/viewer/?uri=github.com/matta813/pgsentinel)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/matta813/PGSentinel/badge)](https://scorecard.dev/viewer/?uri=github.com/matta813/PGSentinel)
 
 PostgreSQL monitoring and health analysis that explains **what is wrong, why it matters, the evidence behind it, and what to investigate next**. pgsentinel is deliberately an operations inbox rather than a wall of graphs.
 
@@ -31,7 +31,7 @@ Install Docker with the Compose v2 plugin, then run:
 curl -fsSL https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh | sh
 ```
 
-The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, and starts it. It prints the generated administrator password once. Open <http://localhost:8080>, sign in, then add an existing PostgreSQL server under **Servers**.
+The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, starts it, and waits for a healthy service. It prints the generated administrator password once. Open <http://localhost:8080>, sign in, then add an existing PostgreSQL server under **Servers**. Re-running the installer preserves the existing `.env` and data volume.
 
 To inspect the files before starting instead:
 
@@ -55,7 +55,7 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    tmpfs: [/tmp:rw,noexec,nosuid,nodev,size=64m]
+    tmpfs: /tmp:rw,noexec,nosuid,nodev,size=64m
     ports: ["8080:8080"]
     volumes: ["./data:/data"]
     environment:
@@ -109,18 +109,18 @@ Passwords, tokens, and full connection URLs are never logged or returned by norm
 
 ## Releases
 
-[`RELEASE`](RELEASE) is the single source of truth. To publish, change its sole line to a greater Semantic Version and push that commit to `main`:
+Completed pull requests are merged individually into protected `main`; `RELEASE` stays at the latest published version while changes accumulate. GitHub later builds the release notes from every merged pull request between the previous and new tags. To publish the accumulated work, change [`RELEASE`](RELEASE) to a greater Semantic Version in a dedicated release pull request:
 
 ```bash
-git switch -c release/0.2.0
-printf '0.2.0\n' > RELEASE
+git switch -c release/0.3.0
+printf '0.3.0\n' > RELEASE
 git add RELEASE
-git commit -m "chore: release 0.2.0"
-git push -u origin release/0.2.0
+git commit -m "chore: release 0.3.0"
+git push -u origin release/0.3.0
 gh pr create --base main --fill
 ```
 
-After lint, tests and builds pass, GitHub Actions exclusively for that version change publishes `:0.2.0`, `:v0.2.0`, and—for stable versions—`:latest` to GHCR. It then creates Git tag and GitHub Release `v0.2.0` with grouped Conventional Commit notes. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal commits, pull requests, branches and tag events do not build a container.
+After lint, tests and builds pass, GitHub Actions publishes the version, `v`-prefixed, and—for stable releases—`latest` image tags to GHCR. It creates the Git tag and a counted, categorized release page with pull-request links, authors, first-time contributors, and a full comparison link. Pre-releases such as `1.0.0-rc.1` never update `latest`. Normal feature or fix merges do not publish a container.
 
 Pin production deployments to a version:
 
@@ -162,7 +162,7 @@ The maintained roadmap and contribution priorities are in [ROADMAP.md](ROADMAP.m
 
 ## Community
 
-Contributions are welcome. Read the [contribution guide](CONTRIBUTING.md), use [GitHub Discussions](https://github.com/matta813/pgsentinel/discussions) for support, and report vulnerabilities according to the [security policy](SECURITY.md). Project participation follows the [Code of Conduct](CODE_OF_CONDUCT.md) and [governance model](GOVERNANCE.md).
+Contributions are welcome. Read the [contribution guide](CONTRIBUTING.md), use [GitHub Discussions](https://github.com/matta813/PGSentinel/discussions) for support, and report vulnerabilities according to the [security policy](SECURITY.md). Project participation follows the [Code of Conduct](CODE_OF_CONDUCT.md) and [governance model](GOVERNANCE.md).
 
 PGSentinel is licensed under the [MIT License](LICENSE).
 

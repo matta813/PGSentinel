@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions and support
-    url: https://github.com/matta813/pgsentinel/discussions
+    url: https://github.com/matta813/PGSentinel/discussions
     about: Ask setup, usage, and troubleshooting questions in Discussions.
   - name: Security vulnerability
-    url: https://github.com/matta813/pgsentinel/security/advisories/new
+    url: https://github.com/matta813/PGSentinel/security/advisories/new
     about: Report vulnerabilities privately. Do not open a public issue.

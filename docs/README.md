@@ -5,7 +5,7 @@
 - [Deployment](deployment.md): Compose, persistence, upgrades, backups, and hardening
 - [Monitoring user](monitoring-user.md): PostgreSQL roles, TLS, and `pg_stat_statements`
 - [Health rules](health-rules.md): evidence, thresholds, confidence, and health scoring
-- [Releases](releases.md): versioning, images, and automated publication
+- [Releases](releases.md): release trains, versioning, images, notes, contributors, and automated publication
 
 ## Contributors
 

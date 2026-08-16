@@ -11,4 +11,4 @@ GRANT pg_monitor TO pgsentinel;
 
 For query statistics, add `pg_stat_statements` to `shared_preload_libraries`, restart PostgreSQL, then run `CREATE EXTENSION pg_stat_statements` in each monitored database. pgsentinel does not need ownership of application objects and does not run VACUUM, CREATE/DROP INDEX, terminate backends, reset statistics, or change settings.
 
-The monitoring role may see query text and session metadata. Restrict access to pgsentinel itself and its `/data` volume, never expose it directly to an untrusted network, and use a reverse proxy with authentication and TLS. Native pgsentinel user authentication is not included in this release.
+The monitoring role may see query text and session metadata. Restrict access to PGSentinel and its `/data` volume and never expose it directly to an untrusted network. PGSentinel requires its native administrator login; production deployments should additionally use TLS, network-level access control, and `Secure` session cookies. Configure trusted proxy CIDRs explicitly when a reverse proxy supplies client addresses.

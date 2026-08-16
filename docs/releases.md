@@ -17,17 +17,23 @@ gh pr create --base main --fill
 
 Because `main` is protected, submit the version bump through a pull request. Merging that reviewed PR produces the direct `main` event consumed by the release workflow. It is valid—and preferred—to include version-specific Compose and documentation updates in the same release PR.
 
+## Accumulating changes
+
+Normal feature, fix, documentation, security, and dependency pull requests merge independently into `main` without changing `RELEASE`. The branch therefore accumulates the next version as a sequence of small reviewed changes instead of one large release merge. Every merge must leave `main` buildable and tested; unfinished behavior should remain unmerged or be protected by a disabled-by-default feature flag.
+
+The previous release tag is the lower boundary of the next changelog. When the release pull request finally changes `RELEASE`, GitHub compares that previous tag with the release commit and discovers every merged pull request in between. Patch maintenance for older release lines would require explicit release branches and backports; the pre-1.0 project currently supports only the latest published line.
+
 ## Pipeline behavior
 
 The `CI` workflow runs Go and frontend lint, tests, and production builds for `main` and pull requests. The separate `Release` workflow runs only for a direct push to `main` where `RELEASE` changed, or an explicit recovery dispatch. It does not listen for tags, preventing a release loop. GitHub Actions concurrency serializes publication.
 
-Publication order is verification, image build, version image push, `v` image push, optional `latest` push, then GitHub release/tag creation from the exact commit SHA. A recovery dispatch may safely repush image tags and repairs an existing release record instead of creating a duplicate. Normal release validation rejects an existing tag before expensive work.
+Publication order is version validation, full application verification, image build, version image push, `v` image push, optional `latest` push, then GitHub release/tag creation from the exact commit SHA. Compose semantics and the synchronization of `RELEASE`, Compose defaults, Quickstart, and `.env.example` are tested in CI. A recovery dispatch may safely repush image tags and repair an existing release record instead of creating a duplicate. Normal release validation rejects an existing tag before expensive work.
 
 ## Release notes
 
-The release workflow asks GitHub to generate notes for the exact range between the previous tag and the new release commit. This supplies authoritative pull request links, authors, the full comparison link, and a `New Contributors` section whenever GitHub identifies a contributor's first merged pull request.
+The release workflow asks GitHub to generate notes for the exact range between the previous tag and the new release commit. This supplies authoritative pull request links, authors, the full comparison link, and a `New Contributors` section whenever GitHub identifies a contributor's first merged pull request. No contributor file or manual list is maintained.
 
-PGSentinel then formats those entries into a Jellyfin-inspired release page with a launch heading, upgrade reminder, counted changelog, and emoji categories. Conventional pull request titles such as `feat:`, `fix(security):`, `perf:`, `docs:`, and `chore(deps):` determine the category; unmatched titles appear under General Changes. Apply the `skip-changelog` label before merging a pull request that should not appear in release notes.
+PGSentinel then formats those entries into a Jellyfin-inspired release page with a launch heading, upgrade reminder, counted changelog, and emoji categories for Security, Features, Bug fixes, Performance, Documentation, Dependencies, Tests, Maintenance, and General Changes. Conventional pull request titles such as `feat:`, `fix(security):`, `perf:`, `docs:`, and `chore(deps):` determine the category; unmatched titles appear under General Changes. Apply the `skip-changelog` label before merging a pull request that should not appear in release notes.
 
 ## Image tags
 

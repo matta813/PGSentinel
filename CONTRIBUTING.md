@@ -33,6 +33,8 @@ Keep commits reviewable and avoid unrelated formatting changes. Never commit cre
 
 Pull requests require passing CI and resolved review conversations. Explain user-visible behavior, operational risk, and verification. Add documentation for new settings, collectors, rules, APIs, or deployment requirements.
 
+The pull-request title becomes part of the next automated release notes. Use `feat:`, `fix:`, `fix(security):`, `perf:`, `docs:`, `test:`, `refactor:`, `ci:`, `build:`, or `chore(deps):` so it lands in the intended category. GitHub automatically recognizes a contributor's first merged pull request and adds the contributor to the release page. Maintainers may apply `skip-changelog` to omit internal-only work.
+
 Maintainers may ask to split oversized changes. Dependency pull requests are reviewed manually; no dependency update is auto-merged.
 
 By contributing, you agree that your contribution is licensed under the repository's [MIT License](LICENSE).
