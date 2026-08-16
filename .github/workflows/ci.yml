@@ -26,6 +26,7 @@ jobs:
           ./scripts/test-release.sh
           ./scripts/test-release-notes.sh
           ./scripts/test-github-workflows.sh
+          ./scripts/test-compose.sh
 
   backend:
     runs-on: ubuntu-latest
