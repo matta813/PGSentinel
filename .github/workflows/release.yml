@@ -90,7 +90,9 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
           STABLE: ${{ needs.validate.outputs.stable }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY}"
+          # OCI repository names must be lowercase; GitHub preserves the
+          # mixed-case repository display name in GITHUB_REPOSITORY.
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
           {
             echo 'tags<<EOF'
             echo "$image:$VERSION"
