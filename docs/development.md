@@ -41,8 +41,9 @@ GitHub Actions runs the same campaign for relevant pull requests, weekly, and on
 
 Dependencies are monitored by GitHub's native Dependabot using [`.github/dependabot.yml`](../.github/dependabot.yml). It checks Go modules and checksums, npm manifests and `package-lock.json`, Dockerfile/Compose images, and GitHub Actions every day at 04:00 Europe/Zurich. All updates use `dependabot/*` pull requests; the bot never commits directly to `main`.
 
-- Patch updates are grouped by ecosystem, but always wait for human review.
-- Minor and major updates also always wait for human review.
+- Go, Docker and GitHub Actions updates are grouped by ecosystem and SemVer level (`patch`, `minor`, or `major`).
+- npm patch and minor updates are split into runtime and development groups, while npm major updates share one clearly visible major-update group.
+- Grouping only batches related updates into fewer pull requests. It does not enable auto-merge; patch, minor, major, and security updates all wait for human review.
 - GitHub creates security update pull requests independently of the version-update schedule when Dependabot security updates are enabled.
 - Manifest and lockfile changes are committed together in the same pull request.
 

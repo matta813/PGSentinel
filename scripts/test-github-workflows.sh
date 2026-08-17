@@ -34,6 +34,17 @@ grep -Fq 'package-ecosystem: gomod' "$dependabot"
 grep -Fq 'package-ecosystem: npm' "$dependabot"
 grep -Fq 'package-ecosystem: docker' "$dependabot"
 grep -Fq 'package-ecosystem: github-actions' "$dependabot"
+for group in \
+  go-patches go-minor go-major \
+  frontend-runtime-patches frontend-development-patches \
+  frontend-runtime-minor frontend-development-minor frontend-major \
+  docker-patches docker-minor docker-major \
+  github-actions-patches github-actions-minor github-actions-major; do
+  grep -Fq "      $group:" "$dependabot"
+done
+for update_type in patch minor major; do
+  grep -Fq "update-types: [$update_type]" "$dependabot"
+done
 if grep -Fq 'RELEASE' "$dependabot"; then
   echo "Dependabot must not manage RELEASE" >&2
   exit 1
