@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
+	stdErrors "errors"
 	"github.com/google/uuid"
 	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/buildinfo"
@@ -108,7 +108,7 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if stdErrors.As(err, &tooLarge) {
 			failure(w, http.StatusRequestEntityTooLarge, "Request body too large", nil)
 			return false
 		}
@@ -134,5 +134,3 @@ func security(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-var errNotFound = errors.New("not found")

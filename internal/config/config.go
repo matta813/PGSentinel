@@ -45,6 +45,9 @@ func Load() (Config, error) {
 	if c.EncryptionKey == "" {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY is required; generate one with openssl rand -base64 32")
 	}
+	if len(c.EncryptionKey) < 32 {
+		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY must contain at least 32 characters")
+	}
 	if len(c.AdminPassword) < 12 {
 		return Config{}, fmt.Errorf("PGSENTINEL_ADMIN_PASSWORD must contain at least 12 characters")
 	}

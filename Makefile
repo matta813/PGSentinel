@@ -16,6 +16,7 @@ test:
 lint:
 	test -z "$$(gofmt -l $$(find . -name '*.go' -not -path './frontend/*'))"
 	go vet ./...
+	golangci-lint run ./...
 	npm --prefix frontend run lint
 	npm --prefix frontend run typecheck
 
