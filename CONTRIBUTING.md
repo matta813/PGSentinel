@@ -19,22 +19,103 @@ Thank you for improving PGSentinel. Contributions should help an administrator u
 
 Keep commits reviewable and avoid unrelated formatting changes. Never commit credentials, database dumps, production queries, or tokens.
 
-## Engineering expectations
+## Branch naming
 
-- Health findings need evidence, severity, confidence, impact, and cautious investigation guidance.
-- Recommendations must not claim certainty the collected evidence cannot support.
-- PGSentinel never applies destructive PostgreSQL changes automatically.
-- Collectors must work with PostgreSQL 15+ or degrade explicitly by server version.
-- Collection queries should be bounded and avoid adding meaningful load.
-- API changes belong under `/api/v1` until a deliberate version transition.
-- Go code must pass `gofmt`, `go vet`, and tests. TypeScript remains strict and free of unnecessary `any`.
+Use descriptive branch names with prefixes:
+- `feat/` — new features
+- `fix/` — bug fixes
+- `fix(security)/` — security fixes
+- `perf/` — performance improvements
+- `docs/` — documentation only
+- `test/` — test additions
+- `refactor/` — code restructuring
+- `ci/` — CI/CD changes
+- `build/` — build system changes
+- `chore/` — maintenance tasks
+
+Example: `feat/add-replication-slot-analysis`
+
+## Commit messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Types: `feat`, `fix`, `fix(security)`, `perf`, `docs`, `test`, `refactor`, `ci`, `build`, `chore`
+
+Examples:
+```
+feat(analyzer): add dead tuple ratio threshold configuration
+fix(storage): handle SQLite busy timeout on concurrent writes
+perf(collector): parallelize server collection with worker pool
+docs: update deployment guide for Kubernetes
+```
+
+## Code standards
+
+### Go
+- `gofmt` formatting (enforced by CI)
+- `go vet` passes
+- `golangci-lint` passes (see `.golangci.yml`)
+- Tests pass with `-race` flag
+- No unnecessary global state
+- Structured errors using `internal/errors` package
+- Context propagation for cancellation
+
+### TypeScript/React
+- Strict TypeScript (`noImplicitAny`, `strictNullChecks`)
+- ESLint passes with React hooks rules enabled
+- No unnecessary `any` types
+- Component props typed with interfaces
+- Tests with Vitest and React Testing Library
+
+## Testing expectations
+
+- Unit tests for new business logic (analyzers, collectors, storage)
+- Integration tests for API endpoints
+- Frontend component tests for new UI components
+- Test edge cases: empty results, errors, timeouts, context cancellation
+- Run `make test` locally before pushing
 
 ## Pull requests
 
-Pull requests require passing CI and resolved review conversations. Explain user-visible behavior, operational risk, and verification. Add documentation for new settings, collectors, rules, APIs, or deployment requirements.
+Pull requests require passing CI and resolved review conversations. Explain:
+- User-visible behavior changes
+- Operational risk and rollback plan
+- How you verified the change
 
-The pull-request title becomes part of the next automated release notes. Use `feat:`, `fix:`, `fix(security):`, `perf:`, `docs:`, `test:`, `refactor:`, `ci:`, `build:`, or `chore(deps):` so it lands in the intended category. GitHub automatically recognizes a contributor's first merged pull request and adds the contributor to the release page. Maintainers may apply `skip-changelog` to omit internal-only work.
+Add documentation for:
+- New settings
+- New collectors or metrics
+- New health rules
+- New API endpoints
+- Deployment requirements
+
+The pull-request title becomes part of the next automated release notes. Use the commit type prefixes so it lands in the intended category. GitHub automatically recognizes a contributor's first merged pull request and adds the contributor to the release page. Maintainers may apply `skip-changelog` to omit internal-only work.
 
 Maintainers may ask to split oversized changes. Dependency pull requests are reviewed manually; no dependency update is auto-merged.
+
+## Review guidelines
+
+When reviewing:
+- Check for security implications (input validation, auth, encryption)
+- Verify tests cover the change
+- Ensure no breaking API changes without version bump
+- Confirm documentation is updated
+- Look for performance regressions
+
+## Release process
+
+1. Create `release/x.y.z` branch from `main`
+2. Update `RELEASE` file with new semantic version
+3. Open PR targeting `main`
+4. After CI passes and approval, merge
+5. GitHub Actions builds, publishes, and creates release
 
 By contributing, you agree that your contribution is licensed under the repository's [MIT License](LICENSE).
