@@ -13,6 +13,12 @@ updates:
       go-patches:
         patterns: ["*"]
         update-types: [patch]
+      go-minor:
+        patterns: ["*"]
+        update-types: [minor]
+      go-major:
+        patterns: ["*"]
+        update-types: [major]
 
   - package-ecosystem: npm
     directory: /frontend
@@ -32,6 +38,17 @@ updates:
         dependency-type: development
         patterns: ["*"]
         update-types: [patch]
+      frontend-runtime-minor:
+        dependency-type: production
+        patterns: ["*"]
+        update-types: [minor]
+      frontend-development-minor:
+        dependency-type: development
+        patterns: ["*"]
+        update-types: [minor]
+      frontend-major:
+        patterns: ["*"]
+        update-types: [major]
 
   - package-ecosystem: docker
     directory: /
@@ -45,6 +62,12 @@ updates:
       docker-patches:
         patterns: ["*"]
         update-types: [patch]
+      docker-minor:
+        patterns: ["*"]
+        update-types: [minor]
+      docker-major:
+        patterns: ["*"]
+        update-types: [major]
 
   - package-ecosystem: github-actions
     directory: /
@@ -58,3 +81,9 @@ updates:
       github-actions-patches:
         patterns: ["*"]
         update-types: [patch]
+      github-actions-minor:
+        patterns: ["*"]
+        update-types: [minor]
+      github-actions-major:
+        patterns: ["*"]
+        update-types: [major]
