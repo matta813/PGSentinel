@@ -10,7 +10,7 @@ import (
 )
 
 func TestNotificationDestinationCRUDEncryptsConfig(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "notifications.db"), "long enough encryption key")
+	s, err := Open(filepath.Join(t.TempDir(), "notifications.db"), "long-enough-encryption-key-32-chars")
 	if err != nil {
 		t.Fatal(err)
 	}

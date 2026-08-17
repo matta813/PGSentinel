@@ -1,6 +1,6 @@
 # Development
 
-Install Go 1.26 and Node 24+, then `npm ci --prefix frontend`. Run the API with a writable data directory and a stable key:
+Install Go 1.25 and Node 22+, then `npm ci --prefix frontend`. Run the API with a writable data directory and a stable key:
 
 ```bash
 export PGSENTINEL_DATA_DIR="$PWD/data"
@@ -10,6 +10,8 @@ make backend
 ```
 
 In another terminal, `make frontend`; Vite proxies API requests to port 8080. `make test`, `make lint`, and `make build` mirror CI. Docker integration is `make docker-up`.
+
+The production Dockerfile uses a BuildKit cache mount for npm's download cache. This speeds up repeated image builds without copying `node_modules` or cached packages into the resulting image layers.
 
 `PGSENTINEL_RETENTION` controls raw snapshot retention and is applied by the hourly pruning task. Use a Go duration such as `168h` or `720h`; findings and server configuration are not removed by snapshot retention.
 
@@ -45,6 +47,8 @@ Dependencies are monitored by GitHub's native Dependabot using [`.github/dependa
 At most five pull requests per ecosystem remain open. Dependabot uses the package manager's existing version constraints and does not convert the project wholesale to exact pins.
 
 GitHub Actions and Docker base images are pinned to immutable commit SHAs or image digests. The readable version comment or image tag remains alongside the pin, and Dependabot updates both together. This prevents a moved upstream tag from changing a trusted CI or release build without review.
+
+The root `osv-scanner.toml` contains the documented exception for `GO-2026-5932`. That advisory applies to the unmaintained `golang.org/x/crypto/openpgp` package, while PGSentinel uses only `golang.org/x/crypto/argon2`. Workflow tests reject any future OpenPGP import so the exception cannot silently outlive its justification. Review and remove security exceptions whenever dependency usage changes.
 
 `RELEASE` is not a dependency manifest and is absent from every Dependabot ecosystem. Dependabot never changes product versions, creates release tags, or publishes release images. Pull requests run lint, tests, Compose validation, and application builds, while the release workflow requires a direct `main` push changing `RELEASE`.
 
