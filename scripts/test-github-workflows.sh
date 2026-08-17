@@ -4,10 +4,12 @@ set -eu
 ci=.github/workflows/ci.yml
 release=.github/workflows/release.yml
 dependabot=.github/dependabot.yml
+osv_config=osv-scanner.toml
 
 test -f "$ci"
 test -f "$release"
 test -f "$dependabot"
+test -f "$osv_config"
 grep -Fq 'paths: [RELEASE]' "$release"
 grep -Fq 'packages: write' "$release"
 grep -Fq 'docker/build-push-action@' "$release"
@@ -34,6 +36,12 @@ grep -Fq 'package-ecosystem: docker' "$dependabot"
 grep -Fq 'package-ecosystem: github-actions' "$dependabot"
 if grep -Fq 'RELEASE' "$dependabot"; then
   echo "Dependabot must not manage RELEASE" >&2
+  exit 1
+fi
+grep -Fq 'id = "GO-2026-5932"' "$osv_config"
+grep -Fq 'openpgp package is not imported or linked' "$osv_config"
+if grep -REq '"golang.org/x/crypto/openpgp([/"]|$)' --include='*.go' .; then
+  echo "GO-2026-5932 exception is invalid when openpgp is imported" >&2
   exit 1
 fi
 echo "GitHub workflow tests passed"
