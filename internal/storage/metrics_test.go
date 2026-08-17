@@ -10,7 +10,7 @@ import (
 )
 
 func TestMetricHistoryFiltersOrdersAndPrunes(t *testing.T) {
-	s, err := Open(filepath.Join(t.TempDir(), "metrics.db"), "long enough encryption key")
+	s, err := Open(filepath.Join(t.TempDir(), "metrics.db"), "long-enough-encryption-key-32-chars")
 	if err != nil {
 		t.Fatal(err)
 	}
