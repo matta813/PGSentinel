@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/buildinfo"
+	"github.com/matta813/pgsentinel/internal/errors"
 	"github.com/matta813/pgsentinel/internal/notifications"
 	"github.com/matta813/pgsentinel/internal/storage"
 	"io"
@@ -94,12 +95,38 @@ func write(w http.ResponseWriter, status int, value any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
-func failure(w http.ResponseWriter, status int, msg string, err error) {
-	detail := ""
-	if err != nil {
-		detail = err.Error()
+func writeError(w http.ResponseWriter, err error) {
+	var appErr *errors.AppError
+	if errorsAs(err, &appErr) {
+		write(w, appErr.HTTPStatus(), map[string]string{"error": appErr.Code.String(), "message": appErr.Message})
+		return
 	}
-	write(w, status, map[string]string{"error": msg, "detail": detail})
+	write(w, http.StatusInternalServerError, map[string]string{"error": "INTERNAL", "message": "Internal server error"})
+}
+
+func errorsAs(err error, target **errors.AppError) bool {
+	var appErr *errors.AppError
+	for e := err; e != nil; e = unwrap(e) {
+		if e, ok := e.(*errors.AppError); ok {
+			appErr = e
+			break
+		}
+	}
+	if appErr == nil {
+		return false
+	}
+	*target = appErr
+	return true
+}
+
+func unwrap(err error) error {
+	type unwrapper interface {
+		Unwrap() error
+	}
+	if u, ok := err.(unwrapper); ok {
+		return u.Unwrap()
+	}
+	return nil
 }
 func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 	const maxJSONBody = 64 << 10
