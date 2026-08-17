@@ -133,7 +133,7 @@ docker pull ghcr.io/matta813/pgsentinel:0.3.1
 
 ## Development
 
-Requires Go 1.26, Node 24+, npm and optionally Docker.
+Requires Go 1.25, Node 22+, npm and optionally Docker.
 
 ```bash
 npm ci --prefix frontend

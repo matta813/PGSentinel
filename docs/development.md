@@ -1,6 +1,6 @@
 # Development
 
-Install Go 1.26 and Node 24+, then `npm ci --prefix frontend`. Run the API with a writable data directory and a stable key:
+Install Go 1.25 and Node 22+, then `npm ci --prefix frontend`. Run the API with a writable data directory and a stable key:
 
 ```bash
 export PGSENTINEL_DATA_DIR="$PWD/data"
