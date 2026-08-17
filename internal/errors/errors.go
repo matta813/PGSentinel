@@ -8,14 +8,14 @@ import (
 type ErrorCode string
 
 const (
-	CodeNotFound         ErrorCode = "NOT_FOUND"
-	CodeUnauthorized     ErrorCode = "UNAUTHORIZED"
-	CodeForbidden        ErrorCode = "FORBIDDEN"
-	CodeConflict         ErrorCode = "CONFLICT"
-	CodeInvalidInput     ErrorCode = "INVALID_INPUT"
-	CodeInternal         ErrorCode = "INTERNAL"
+	CodeNotFound           ErrorCode = "NOT_FOUND"
+	CodeUnauthorized       ErrorCode = "UNAUTHORIZED"
+	CodeForbidden          ErrorCode = "FORBIDDEN"
+	CodeConflict           ErrorCode = "CONFLICT"
+	CodeInvalidInput       ErrorCode = "INVALID_INPUT"
+	CodeInternal           ErrorCode = "INTERNAL"
 	CodeServiceUnavailable ErrorCode = "SERVICE_UNAVAILABLE"
-	CodeTooManyRequests  ErrorCode = "TOO_MANY_REQUESTS"
+	CodeTooManyRequests    ErrorCode = "TOO_MANY_REQUESTS"
 )
 
 type AppError struct {
