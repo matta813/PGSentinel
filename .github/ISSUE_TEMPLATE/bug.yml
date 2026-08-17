@@ -11,7 +11,7 @@ body:
     attributes:
       label: PGSentinel version
       description: The release tag or commit SHA, visible in Settings.
-      placeholder: 0.3.1
+      placeholder: 0.3.2
     validations:
       required: true
   - type: input
