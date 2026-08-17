@@ -36,7 +36,7 @@ func TestCollectionCyclesSelectExpectedWork(t *testing.T) {
 }
 
 func TestManagerUsesConfiguredRetention(t *testing.T) {
-	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long enough encryption key")
+	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long-enough-encryption-key-32-chars")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,7 @@ package storage
 import "testing"
 
 func TestCipherRoundTrip(t *testing.T) {
-	c, err := NewCipher("a sufficiently long test key")
+	c, err := NewCipher("a-sufficiently-long-test-key-32chars")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func FuzzCipherRoundTrip(f *testing.F) {
 	for _, seed := range []string{"", "secret-password", "pässwörd-🔐", string([]byte{0, 1, 2, 255})} {
 		f.Add(seed)
 	}
-	c, err := NewCipher("a sufficiently long fuzz test key")
+	c, err := NewCipher("a-sufficiently-long-fuzz-test-key-32chars")
 	if err != nil {
 		f.Fatal(err)
 	}
