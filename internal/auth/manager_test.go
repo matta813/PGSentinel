@@ -40,7 +40,10 @@ func TestLoginAttemptLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := requestFrom("192.0.2.10:1234", "")
-	if !m.AllowAttempt(r) || !m.AllowAttempt(r) || m.AllowAttempt(r) {
+	first := m.AllowAttempt(r)
+	second := m.AllowAttempt(r)
+	third := m.AllowAttempt(r)
+	if !first || !second || third {
 		t.Fatal("attempt limit was not enforced per client address")
 	}
 	m.ResetAttempts(r)
