@@ -29,7 +29,7 @@ func Open(path, key string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(4)
 	s := &Store{DB: db, cipher: c}
 	if err := s.migrate(context.Background()); err != nil {
 		db.Close()
