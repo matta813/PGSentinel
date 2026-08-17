@@ -209,5 +209,5 @@ func parseAddress(remote string) netip.Addr {
 }
 
 func derivePassword(password string, salt []byte) []byte {
-	return argon2.IDKey([]byte(password), salt, 3, 64*1024, 2, 32)
+	return argon2.IDKey([]byte(password), salt, 3, 256*1024, 4, 32)
 }
