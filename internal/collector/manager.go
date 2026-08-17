@@ -102,6 +102,9 @@ func (m *Manager) collectAll(ctx context.Context, cycle collectionCycle) {
 		return
 	}
 	for _, server := range servers {
+		if ctx.Err() != nil {
+			return
+		}
 		m.collect(ctx, server, cycle)
 	}
 }
