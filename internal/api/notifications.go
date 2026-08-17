@@ -6,7 +6,6 @@ import (
 	"github.com/matta813/pgsentinel/internal/models"
 	"github.com/matta813/pgsentinel/internal/notifications"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
