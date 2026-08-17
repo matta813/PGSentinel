@@ -45,7 +45,7 @@ func (p TargetPolicy) client() *http.Client {
 	return &http.Client{Transport: transport, Timeout: 15 * time.Second, CheckRedirect: p.checkRedirect}
 }
 
-func (p TargetPolicy) validateURL(raw string) error {
+func (p TargetPolicy) ValidateURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
 		return fmt.Errorf("provider URL must be an absolute HTTP(S) URL")
@@ -88,7 +88,7 @@ func (p TargetPolicy) checkRedirect(req *http.Request, via []*http.Request) erro
 	if len(via) >= 3 {
 		return fmt.Errorf("notification redirect limit exceeded")
 	}
-	return p.validateURL(req.URL.String())
+	return p.ValidateURL(req.URL.String())
 }
 
 func (p TargetPolicy) permits(host string, ip net.IP) bool {

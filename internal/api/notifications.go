@@ -6,6 +6,7 @@ import (
 	"github.com/matta813/pgsentinel/internal/models"
 	"github.com/matta813/pgsentinel/internal/notifications"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -27,7 +28,7 @@ func (v notificationRequest) destination(id string) models.NotificationDestinati
 	}}
 }
 
-func validateNotificationDestination(v notificationRequest) string {
+func validateNotificationDestination(v notificationRequest, policy notifications.TargetPolicy) string {
 	if strings.TrimSpace(v.Name) == "" {
 		return "Name is required"
 	}
@@ -36,9 +37,15 @@ func validateNotificationDestination(v notificationRequest) string {
 		if strings.TrimSpace(v.ServerURL) == "" || strings.TrimSpace(v.Topic) == "" {
 			return "Server URL and topic are required for ntfy"
 		}
+		if err := policy.ValidateURL(v.ServerURL); err != nil {
+			return "Invalid server URL: " + err.Error()
+		}
 	case "webhook":
 		if strings.TrimSpace(v.WebhookURL) == "" {
 			return "Webhook URL is required"
+		}
+		if err := policy.ValidateURL(v.WebhookURL); err != nil {
+			return "Invalid webhook URL: " + err.Error()
 		}
 	default:
 		return "Unsupported notification provider"
@@ -60,7 +67,7 @@ func (a *API) createNotificationDestination(w http.ResponseWriter, r *http.Reque
 	if !decode(w, r, &request) {
 		return
 	}
-	if message := validateNotificationDestination(request); message != "" {
+	if message := validateNotificationDestination(request, a.notificationPolicy); message != "" {
 		failure(w, 422, message, nil)
 		return
 	}
@@ -82,7 +89,7 @@ func (a *API) updateNotificationDestination(w http.ResponseWriter, r *http.Reque
 	if !decode(w, r, &request) {
 		return
 	}
-	if message := validateNotificationDestination(request); message != "" {
+	if message := validateNotificationDestination(request, a.notificationPolicy); message != "" {
 		failure(w, 422, message, nil)
 		return
 	}
