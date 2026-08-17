@@ -26,7 +26,7 @@ type Webhook struct {
 
 func NewWebhook(target string, headers map[string]string, policies ...TargetPolicy) (*Webhook, error) {
 	policy := selectedPolicy(policies)
-	if err := policy.validateURL(target); err != nil {
+	if err := policy.ValidateURL(target); err != nil {
 		return nil, err
 	}
 	return &Webhook{URL: target, Headers: headers, client: policy.client()}, nil
@@ -63,7 +63,7 @@ func NewNtfy(serverURL, topic string, policies ...TargetPolicy) *Ntfy {
 	return &Ntfy{ServerURL: strings.TrimRight(serverURL, "/"), Topic: topic, client: policy.client(), policy: policy}
 }
 func (n *Ntfy) Send(ctx context.Context, m Message) error {
-	if err := n.policy.validateURL(n.ServerURL); err != nil {
+	if err := n.policy.ValidateURL(n.ServerURL); err != nil {
 		return err
 	}
 	payload := map[string]any{"topic": n.Topic, "title": m.Title, "message": m.Body, "priority": priority(m.Severity), "tags": []string{"elephant", "warning"}}
