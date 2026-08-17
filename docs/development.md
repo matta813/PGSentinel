@@ -11,6 +11,8 @@ make backend
 
 In another terminal, `make frontend`; Vite proxies API requests to port 8080. `make test`, `make lint`, and `make build` mirror CI. Docker integration is `make docker-up`.
 
+`make lint` also requires golangci-lint 2.12.2. CI installs that exact version through a commit-pinned official action so local and hosted diagnostics remain reproducible. The v2 configuration starts from an explicit baseline set instead of tool defaults; enable additional linters only after addressing their existing findings so `main` remains green.
+
 The production Dockerfile uses a BuildKit cache mount for npm's download cache. This speeds up repeated image builds without copying `node_modules` or cached packages into the resulting image layers.
 
 `PGSENTINEL_RETENTION` controls raw snapshot retention and is applied by the hourly pruning task. Use a Go duration such as `168h` or `720h`; findings and server configuration are not removed by snapshot retention.

@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/buildinfo"
-	"github.com/matta813/pgsentinel/internal/errors"
 	"github.com/matta813/pgsentinel/internal/notifications"
 	"github.com/matta813/pgsentinel/internal/storage"
 	"io"
@@ -102,39 +101,6 @@ func failure(w http.ResponseWriter, status int, msg string, err error) {
 	}
 	write(w, status, map[string]string{"error": msg, "detail": detail})
 }
-func writeError(w http.ResponseWriter, err error) {
-	var appErr *errors.AppError
-	if errorsAs(err, &appErr) {
-		write(w, appErr.HTTPStatus(), map[string]string{"error": appErr.Code.String(), "message": appErr.Message})
-		return
-	}
-	write(w, http.StatusInternalServerError, map[string]string{"error": "INTERNAL", "message": "Internal server error"})
-}
-
-func errorsAs(err error, target **errors.AppError) bool {
-	var appErr *errors.AppError
-	for e := err; e != nil; e = unwrap(e) {
-		if e, ok := e.(*errors.AppError); ok {
-			appErr = e
-			break
-		}
-	}
-	if appErr == nil {
-		return false
-	}
-	*target = appErr
-	return true
-}
-
-func unwrap(err error) error {
-	type unwrapper interface {
-		Unwrap() error
-	}
-	if u, ok := err.(unwrapper); ok {
-		return u.Unwrap()
-	}
-	return nil
-}
 func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 	const maxJSONBody = 64 << 10
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
@@ -168,5 +134,3 @@ func security(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-var errNotFound = stdErrors.New("not found")
