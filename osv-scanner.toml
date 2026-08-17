@@ -1,0 +1,3 @@
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "PGSentinel uses golang.org/x/crypto/argon2 only; the affected, unmaintained openpgp package is not imported or linked. CI rejects future openpgp imports."
