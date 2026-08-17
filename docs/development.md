@@ -46,6 +46,8 @@ At most five pull requests per ecosystem remain open. Dependabot uses the packag
 
 GitHub Actions and Docker base images are pinned to immutable commit SHAs or image digests. The readable version comment or image tag remains alongside the pin, and Dependabot updates both together. This prevents a moved upstream tag from changing a trusted CI or release build without review.
 
+The root `osv-scanner.toml` contains the documented exception for `GO-2026-5932`. That advisory applies to the unmaintained `golang.org/x/crypto/openpgp` package, while PGSentinel uses only `golang.org/x/crypto/argon2`. Workflow tests reject any future OpenPGP import so the exception cannot silently outlive its justification. Review and remove security exceptions whenever dependency usage changes.
+
 `RELEASE` is not a dependency manifest and is absent from every Dependabot ecosystem. Dependabot never changes product versions, creates release tags, or publishes release images. Pull requests run lint, tests, Compose validation, and application builds, while the release workflow requires a direct `main` push changing `RELEASE`.
 
 Dependabot never enables auto-merge and no merge token or Actions secret is required. Protect `main` with a GitHub ruleset, require the CI jobs as status checks, and review every dependency pull request before merging it.
