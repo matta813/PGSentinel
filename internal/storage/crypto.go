@@ -12,8 +12,8 @@ import (
 type Cipher struct{ aead cipher.AEAD }
 
 func NewCipher(secret string) (*Cipher, error) {
-	if len(secret) < 16 {
-		return nil, fmt.Errorf("encryption key must contain at least 16 characters")
+	if len(secret) < 32 {
+		return nil, fmt.Errorf("encryption key must contain at least 32 characters")
 	}
 	key := sha256.Sum256([]byte(secret))
 	block, err := aes.NewCipher(key[:])
