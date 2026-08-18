@@ -64,3 +64,26 @@ func TestManagerUsesConfiguredRetention(t *testing.T) {
 		t.Fatalf("configured retention kept %d snapshots", count)
 	}
 }
+
+func TestRestoreCapabilitiesPreservesKnownStateOnFastCycles(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long-enough-encryption-key-32-chars")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	server := models.Server{ID: "server", Name: "server", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
+	if err = store.CreateServer(ctx, &server); err != nil {
+		t.Fatal(err)
+	}
+	serverID := "server"
+	at := time.Now().UTC()
+	if err = store.SaveSnapshot(ctx, serverID, "core", models.Snapshot{ServerID: serverID, CollectedAt: at, Capabilities: map[string]bool{"pg_stat_statements": true}}, at); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := models.Snapshot{ServerID: serverID, CollectedAt: at, Capabilities: map[string]bool{}}
+	restoreCapabilities(ctx, store, serverID, &snapshot)
+	if !snapshot.Capabilities["pg_stat_statements"] {
+		t.Fatal("expected pg_stat_statements capability to be preserved on a fast cycle")
+	}
+}
