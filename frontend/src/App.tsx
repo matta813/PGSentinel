@@ -12,7 +12,7 @@ import { SettingsPage } from './pages/SettingsPage'
 export function App() {
   const [authentication, setAuthentication] = useState<'loading' | 'authenticated' | 'anonymous'>('loading')
   useEffect(() => {
-    api.get<{ authenticated: boolean }>('/auth/session').then(() => setAuthentication('authenticated')).catch(() => setAuthentication('anonymous'))
+    api.get<{ authenticated: boolean }>('/auth/session').then((r) => setAuthentication(r.authenticated ? 'authenticated' : 'anonymous')).catch(() => setAuthentication('anonymous'))
     const expired = () => setAuthentication('anonymous')
     window.addEventListener('pgsentinel:unauthorized', expired)
     return () => window.removeEventListener('pgsentinel:unauthorized', expired)
