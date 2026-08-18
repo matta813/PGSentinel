@@ -13,7 +13,11 @@ import (
 type Client struct{ pool *pgxpool.Pool }
 
 func Connect(ctx context.Context, s models.Server) (*Client, error) {
-	u := &url.URL{Scheme: "postgres", Host: fmt.Sprintf("%s:%d", s.Host, s.Port), User: url.UserPassword(s.User, s.Password), Path: "/postgres"}
+	return ConnectDatabase(ctx, s, "postgres")
+}
+
+func ConnectDatabase(ctx context.Context, s models.Server, database string) (*Client, error) {
+	u := &url.URL{Scheme: "postgres", Host: fmt.Sprintf("%s:%d", s.Host, s.Port), User: url.UserPassword(s.User, s.Password), Path: "/" + database}
 	q := u.Query()
 	q.Set("sslmode", s.SSLMode)
 	q.Set("application_name", "pgsentinel")
@@ -29,18 +33,18 @@ func Connect(ctx context.Context, s models.Server) (*Client, error) {
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return nil, friendly(err)
+		return nil, friendly(database, err)
 	}
 	pingCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	if err = pool.Ping(pingCtx); err != nil {
 		pool.Close()
-		return nil, friendly(err)
+		return nil, friendly(database, err)
 	}
 	return &Client{pool: pool}, nil
 }
-func friendly(err error) error {
-	return fmt.Errorf("unable to connect to PostgreSQL; verify reachability, pg_hba.conf, credentials and SSL mode: %w", err)
+func friendly(database string, err error) error {
+	return fmt.Errorf("unable to connect to PostgreSQL database %q; verify reachability, pg_hba.conf, credentials, database access and SSL mode: %w", database, err)
 }
 func (c *Client) Close()              { c.pool.Close() }
 func (c *Client) Pool() *pgxpool.Pool { return c.pool }

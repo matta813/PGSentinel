@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 type Schedule struct {
 	Fast, Standard, Slow, Metadata, Retention time.Duration
+	FanoutLimit                               int
 }
 
 type collectionCycle uint8
@@ -53,6 +55,9 @@ func (s Schedule) normalized() Schedule {
 	}
 	if s.Retention <= 0 {
 		s.Retention = 30 * 24 * time.Hour
+	}
+	if s.FanoutLimit <= 0 {
+		s.FanoutLimit = 32
 	}
 	return s
 }
@@ -151,8 +156,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		_ = m.store.LatestSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
 	}
 	if cycle&cycleSlow != 0 {
-		snapshot.Tables, _ = collector.CollectTables(ctx, "postgres")
-		snapshot.Indexes, _ = collector.CollectIndexes(ctx)
+		snapshot.Tables, snapshot.Indexes = m.collectPerDatabase(ctx, target, snapshot.Databases, snapshot.CollectedAt)
 		_ = m.store.SaveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt)
 		_ = m.store.SaveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt)
 	} else {
@@ -178,6 +182,53 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	_ = m.store.UpsertFindings(ctx, server.ID, findings)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, "healthy", snapshot.Version, "", true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func collectibleDatabases(stats []models.DatabaseStat, limit int) []models.DatabaseStat {
+	out := make([]models.DatabaseStat, 0, len(stats))
+	for _, d := range stats {
+		if d.Name == "" || d.Name == "template0" || d.Name == "template1" {
+			continue
+		}
+		out = append(out, d)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].SizeBytes > out[j].SizeBytes })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, dbStats []models.DatabaseStat, at time.Time) (tables []models.TableStat, indexes []models.IndexStat) {
+	targets := collectibleDatabases(dbStats, m.schedule.FanoutLimit)
+	if len(targets) == 0 {
+		targets = []models.DatabaseStat{{Name: "postgres"}}
+	}
+	for _, db := range targets {
+		if ctx.Err() != nil {
+			return
+		}
+		client, err := pg.ConnectDatabase(ctx, server, db.Name)
+		if err != nil {
+			m.log.Warn("per-database collection failed", "server_id", server.ID, "database", db.Name, "error", err)
+			continue
+		}
+		core := NewCore(client.Pool())
+		dbTables, err := core.CollectTables(ctx, db.Name)
+		if err != nil {
+			m.log.Warn("collect tables", "server_id", server.ID, "database", db.Name, "error", err)
+		} else {
+			tables = append(tables, dbTables...)
+		}
+		dbIndexes, err := core.CollectIndexes(ctx)
+		if err != nil {
+			m.log.Warn("collect indexes", "server_id", server.ID, "database", db.Name, "error", err)
+		} else {
+			indexes = append(indexes, dbIndexes...)
+		}
+		client.Close()
+	}
+	return
 }
 
 func snapshotMetrics(s models.Snapshot) []models.Metric {

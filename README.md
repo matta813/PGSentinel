@@ -14,6 +14,7 @@ PostgreSQL monitoring and health analysis that explains **what is wrong, why it 
 
 - Multiple PostgreSQL servers, encrypted credentials, SSL modes and connection diagnostics
 - Connections, transactions, databases, locks, tables, vacuum, indexes and configuration collection
+- Per-database table and index collection across all databases on each server
 - `pg_stat_statements` query load with a documented multi-factor Query Impact Score
 - Stable problem fingerprints with active, acknowledged, resolved and reopened lifecycle
 - Evidence-driven rules, confidence, weighted server health and category scores
@@ -102,6 +103,7 @@ After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and e
 | `PGSENTINEL_LISTEN_ADDR` | `:8080` | HTTP listen address |
 | `PGSENTINEL_DATA_DIR` | `/data` | SQLite data directory |
 | `PGSENTINEL_STATS_INTERVAL` | `30s` | Monitoring cycle interval |
+| `PGSENTINEL_FANOUT_DATABASE_LIMIT` | `32` | Maximum databases inspected per slow cycle for per-database tables/indexes |
 | `PGSENTINEL_RETENTION` | `720h` | Configured retention horizon |
 | `PGSENTINEL_LOG_LEVEL` | `info` | `info` or `debug` structured JSON logging |
 | `PGSENTINEL_TRUSTED_PROXY_CIDRS` | empty | Exact reverse-proxy CIDRs allowed to supply `X-Forwarded-For` |
@@ -152,7 +154,7 @@ Versioned endpoints live under `/api/v1`: servers and connection tests, overview
 
 ## Roadmap and limitations
 
-- Current collection opens a small pool per cycle and deeply inspects the connection database (`postgres`); per-database fan-out is the next collector milestone.
+- Per-database table and index inspection covers up to `PGSENTINEL_FANOUT_DATABASE_LIMIT` databases (templates excluded, largest first); remaining databases are skipped and the limit is configurable.
 - Raw snapshots have simple retention; tiered downsampling and long-term aggregation are planned.
 - Baseline primitives exist, while continuous per-query 24-hour regression evaluation and causal timeline correlation remain planned.
 - Alert provider delivery tests work; persisted alert-routing rules and automatic dispatch remain planned.

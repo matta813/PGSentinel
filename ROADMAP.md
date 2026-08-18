@@ -4,7 +4,6 @@ PGSentinel's direction is guided by a simple test: can an administrator understa
 
 ## Current priorities
 
-- Expand per-database collection without creating excessive connection or query load.
 - Add tiered metric aggregation and configurable long-term retention.
 - Evaluate query regressions continuously against historical baselines.
 - Persist alert routing rules and dispatch active finding transitions.

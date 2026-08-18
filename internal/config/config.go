@@ -25,6 +25,7 @@ type Config struct {
 	SlowInterval                    time.Duration
 	MetaInterval                    time.Duration
 	Retention                       time.Duration
+	FanoutDatabaseLimit             int
 	FrontendDir                     string
 }
 
@@ -39,8 +40,9 @@ func Load() (Config, error) {
 		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
 		FastInterval:             duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
 		SlowInterval: duration("PGSENTINEL_SLOW_INTERVAL", 5*time.Minute), MetaInterval: duration("PGSENTINEL_META_INTERVAL", 30*time.Minute),
-		Retention:   duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
-		FrontendDir: env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
+		Retention:           duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
+		FanoutDatabaseLimit: positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
+		FrontendDir:         env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
 	}
 	if c.EncryptionKey == "" {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY is required; generate one with openssl rand -base64 32")
@@ -99,4 +101,15 @@ func duration(key string, fallback time.Duration) time.Duration {
 		return time.Duration(n) * time.Second
 	}
 	return fallback
+}
+func positiveInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
 }
