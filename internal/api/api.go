@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	stdErrors "errors"
 	"github.com/google/uuid"
@@ -122,6 +123,13 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 	return true
 }
 func validID(v string) bool { _, err := uuid.Parse(v); return err == nil }
+func validFindingID(v string) bool {
+	if len(v) != 24 {
+		return false
+	}
+	_, err := hex.DecodeString(v)
+	return err == nil
+}
 func security(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
