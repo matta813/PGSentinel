@@ -85,7 +85,7 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 }
 func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validID(id) {
+	if !validFindingID(id) {
 		failure(w, 400, "Invalid problem ID", nil)
 		return
 	}
