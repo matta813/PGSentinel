@@ -30,14 +30,20 @@ func (e *Engine) Analyze(s models.Snapshot) []models.Finding {
 	if s.Connections.LongestTransactionSeconds >= t.LongTransactionSeconds {
 		add(newFinding("long-transaction", s.ServerID, "", "", models.SeverityHigh, "Transactions", "A transaction has been open unusually long", fmt.Sprintf("The longest transaction is %.0f seconds old.", s.Connections.LongestTransactionSeconds), "Long snapshots can delay vacuum cleanup and contribute to lock contention.", models.ConfidenceHigh, []models.Evidence{{Label: "Transaction age", Value: fmt.Sprintf("%.0f seconds", s.Connections.LongestTransactionSeconds)}}))
 	}
-	if len(s.Locks) > 0 {
+	var longBlocked []models.LockInfo
+	for _, l := range s.Locks {
+		if l.DurationSeconds >= t.LongQuerySeconds {
+			longBlocked = append(longBlocked, l)
+		}
+	}
+	if len(longBlocked) > 0 {
 		max := 0.0
-		for _, l := range s.Locks {
+		for _, l := range longBlocked {
 			if l.DurationSeconds > max {
 				max = l.DurationSeconds
 			}
 		}
-		add(newFinding("blocking-queries", s.ServerID, "", "", models.SeverityHigh, "Locks", "Queries are blocked by other sessions", fmt.Sprintf("%d blocked sessions detected; longest wait %.0f seconds.", len(s.Locks), max), "Blocked work can increase application latency and cause cascading connection pressure.", models.ConfidenceHigh, []models.Evidence{{Label: "Affected sessions", Value: fmt.Sprint(len(s.Locks))}, {Label: "Longest wait", Value: fmt.Sprintf("%.0f seconds", max)}}))
+		add(newFinding("blocking-queries", s.ServerID, "", "", models.SeverityHigh, "Locks", "Queries are blocked by other sessions", fmt.Sprintf("%d blocked sessions detected; longest wait %.0f seconds.", len(longBlocked), max), "Blocked work can increase application latency and cause cascading connection pressure.", models.ConfidenceHigh, []models.Evidence{{Label: "Affected sessions", Value: fmt.Sprint(len(longBlocked))}, {Label: "Longest wait", Value: fmt.Sprintf("%.0f seconds", max)}}))
 	}
 	for _, d := range s.Databases {
 		if d.Deadlocks > 0 {

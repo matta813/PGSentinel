@@ -22,3 +22,38 @@ func TestHealthScoreWeightsSeverity(t *testing.T) {
 		t.Fatal("critical must reduce score more")
 	}
 }
+
+func TestBlockingQueriesRuleRequiresLockDurationAboveThreshold(t *testing.T) {
+	base := models.Snapshot{ServerID: "s", Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}}
+	engine := New(DefaultThresholds())
+
+	shortLock := base
+	shortLock.Locks = []models.LockInfo{{BlockedPID: 1, BlockingPID: 2, DurationSeconds: 5}}
+	if got := engine.Analyze(shortLock); rulePresent(got, "blocking-queries") {
+		t.Fatal("transient lock below the threshold must not raise a finding")
+	}
+
+	longLock := base
+	longLock.Locks = []models.LockInfo{{BlockedPID: 1, BlockingPID: 2, DurationSeconds: 90}}
+	found := false
+	for _, f := range engine.Analyze(longLock) {
+		if f.RuleID == "blocking-queries" {
+			found = true
+			if len(f.Evidence) > 0 && f.Evidence[0].Value != "1" {
+				t.Fatalf("finding must count only long locks, evidence %#v", f.Evidence)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("long blocking lock must raise a finding")
+	}
+}
+
+func rulePresent(findings []models.Finding, rule string) bool {
+	for _, f := range findings {
+		if f.RuleID == rule {
+			return true
+		}
+	}
+	return false
+}
