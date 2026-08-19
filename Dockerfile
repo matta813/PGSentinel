@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM golang:1.25-alpine@sha256:1e0126852075c9c60731c8ba49088448b91f63e2aed97ca9d1a9791622a05946 AS backend
+FROM golang:1.26-alpine@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83 AS backend
 WORKDIR /src
 RUN apk add --no-cache git
 COPY go.mod go.sum ./
