@@ -189,15 +189,15 @@ func TestRejectsUnknownFields(t *testing.T) {
 
 func TestProblemStatusValidation(t *testing.T) {
 	h := testAPI(t)
-	validID := "6e75d786-e846-47a6-b8f7-406e47c62aa8"
+	findingID := "a1b2c3d4e5f6a7b8c9d0e1f2"
 	tests := []struct {
 		path string
 		body string
 		want int
 	}{
-		{path: "/api/v1/problems/not-a-uuid/status", body: `{"status":"acknowledged"}`, want: http.StatusBadRequest},
-		{path: "/api/v1/problems/" + validID + "/status", body: `{"status":"resolved"}`, want: http.StatusUnprocessableEntity},
-		{path: "/api/v1/problems/" + validID + "/status", body: `{"status":"acknowledged"}`, want: http.StatusNotFound},
+		{path: "/api/v1/problems/not-a-fingerprint/status", body: `{"status":"acknowledged"}`, want: http.StatusBadRequest},
+		{path: "/api/v1/problems/" + findingID + "/status", body: `{"status":"resolved"}`, want: http.StatusUnprocessableEntity},
+		{path: "/api/v1/problems/" + findingID + "/status", body: `{"status":"acknowledged"}`, want: http.StatusNotFound},
 	}
 	for _, test := range tests {
 		r := httptest.NewRecorder()

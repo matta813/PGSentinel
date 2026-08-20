@@ -135,6 +135,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			m.log.Warn("core collection failed", "server_id", server.ID, "error", err)
 			return
 		}
+		if cycle&cycleStandard == 0 {
+			restoreCapabilities(ctx, m.store, server.ID, &snapshot)
+		}
 	} else if err := m.store.LatestSnapshot(ctx, server.ID, "core", &snapshot); err != nil {
 		m.log.Debug("waiting for initial core snapshot", "server_id", server.ID)
 		return
@@ -229,6 +232,19 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		client.Close()
 	}
 	return
+}
+
+func restoreCapabilities(ctx context.Context, store *storage.Store, serverID string, snapshot *models.Snapshot) {
+	var prev models.Snapshot
+	if err := store.LatestSnapshot(ctx, serverID, "core", &prev); err != nil || prev.Capabilities == nil {
+		return
+	}
+	if snapshot.Capabilities == nil {
+		snapshot.Capabilities = map[string]bool{}
+	}
+	for name, ok := range prev.Capabilities {
+		snapshot.Capabilities[name] = ok
+	}
 }
 
 func snapshotMetrics(s models.Snapshot) []models.Metric {
