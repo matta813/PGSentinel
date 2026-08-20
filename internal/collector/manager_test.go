@@ -35,6 +35,39 @@ func TestCollectionCyclesSelectExpectedWork(t *testing.T) {
 	}
 }
 
+func TestCollectibleDatabasesSkipsTemplatesSortsAndCaps(t *testing.T) {
+	stats := []models.DatabaseStat{
+		{Name: "template0", SizeBytes: 10000000},
+		{Name: "template1", SizeBytes: 9000000},
+		{Name: "analytics", SizeBytes: 50000000},
+		{Name: "postgres", SizeBytes: 8000000},
+		{Name: "app", SizeBytes: 20000000},
+		{Name: "reports", SizeBytes: 1000000},
+	}
+	got := collectibleDatabases(stats, 3)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 databases, got %d: %#v", len(got), got)
+	}
+	wantOrder := []string{"analytics", "app", "postgres"}
+	for i, want := range wantOrder {
+		if got[i].Name != want {
+			t.Fatalf("position %d: got %s, want %s", i, got[i].Name, want)
+		}
+	}
+	if names := collectibleDatabases(nil, 5); len(names) != 0 {
+		t.Fatalf("empty input must yield no targets, got %#v", names)
+	}
+}
+
+func TestScheduleNormalizesFanoutLimit(t *testing.T) {
+	if got := (Schedule{}).normalized().FanoutLimit; got != 32 {
+		t.Fatalf("default fanout limit = %d, want 32", got)
+	}
+	if got := (Schedule{FanoutLimit: 8}).normalized().FanoutLimit; got != 8 {
+		t.Fatalf("custom fanout limit = %d, want 8", got)
+	}
+}
+
 func TestManagerUsesConfiguredRetention(t *testing.T) {
 	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long-enough-encryption-key-32-chars")
 	if err != nil {

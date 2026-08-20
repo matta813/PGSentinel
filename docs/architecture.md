@@ -14,7 +14,7 @@ Operational API routes require an administrator session. The administrator passw
 
 Notification delivery uses a dedicated outbound policy. It rejects URL credentials and unsafe address ranges, disables ambient HTTP proxies, resolves targets at dial time, and validates redirects to reduce SSRF and DNS-rebinding risk. Exact private host allowlisting is available for trusted self-hosted providers.
 
-Collectors are read-only and set `application_name=pgsentinel`. The scheduler currently performs a 30-second full cycle; the packages are split by cost so future scheduling can independently run fast (connections/locks), standard (databases/queries), slow (tables/indexes/vacuum), and metadata collectors. Connections use short timeouts and a pool capped at two.
+Collectors are read-only and set `application_name=pgsentinel`. The scheduler currently performs a 30-second full cycle; the packages are split by cost so future scheduling can independently run fast (connections/locks), standard (databases/queries), slow (tables/indexes/vacuum), and metadata collectors. Connections use short timeouts and a pool capped at two. On slow cycles, table and index collection fans out per database: it connects to each collectible database (templates excluded, up to the configured fan-out limit, largest first), aggregates the results into a single snapshot per server, and skips databases that reject the monitoring connection.
 
 Analyzer rules are pure transformations from snapshots to findings. A fingerprint derived from rule, server, database and resource gives an issue stable identity. Storage upserts matching issues, resolves disappeared issues and reopens recurring ones. No analyzer performs a database mutation.
 

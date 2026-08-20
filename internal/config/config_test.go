@@ -22,6 +22,31 @@ func TestLoadDefaults(t *testing.T) {
 	if c.ListenAddr != ":8080" || c.FastInterval.Seconds() != 5 || len(c.TrustedProxyCIDRs) != 2 {
 		t.Fatalf("unexpected defaults: %+v", c)
 	}
+	if c.FanoutDatabaseLimit != 32 {
+		t.Fatalf("default fanout database limit = %d, want 32", c.FanoutDatabaseLimit)
+	}
+}
+
+func TestLoadParsesFanoutDatabaseLimit(t *testing.T) {
+	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
+	t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "test-encryption-key-32-chars-min")
+	t.Setenv("PGSENTINEL_ADMIN_PASSWORD", "a-secure-test-password")
+	t.Setenv("PGSENTINEL_FANOUT_DATABASE_LIMIT", "8")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.FanoutDatabaseLimit != 8 {
+		t.Fatalf("fanout database limit = %d, want 8", c.FanoutDatabaseLimit)
+	}
+	t.Setenv("PGSENTINEL_FANOUT_DATABASE_LIMIT", "invalid")
+	c, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.FanoutDatabaseLimit != 32 {
+		t.Fatalf("invalid fanout value must fall back, got %d", c.FanoutDatabaseLimit)
+	}
 }
 
 func TestLoadRequiresStrongAdminPassword(t *testing.T) {
