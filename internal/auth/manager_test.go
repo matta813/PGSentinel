@@ -157,7 +157,10 @@ func TestExistingUserIsNotOverwrittenByBootstrap(t *testing.T) {
 func TestLoginAttemptLimit(t *testing.T) {
 	manager, _ := newTestManager(t, func(config *Config) { config.MaxAttempts = 2; config.AttemptWindow = time.Minute })
 	request := requestFrom("192.0.2.10:1234", "")
-	if !manager.AllowAttempt(request) || !manager.AllowAttempt(request) || manager.AllowAttempt(request) {
+	first := manager.AllowAttempt(request)
+	second := manager.AllowAttempt(request)
+	third := manager.AllowAttempt(request)
+	if !first || !second || third {
 		t.Fatal("attempt limit was not enforced per client address")
 	}
 	manager.ResetAttempts(request)
