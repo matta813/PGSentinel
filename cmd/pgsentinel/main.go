@@ -39,7 +39,7 @@ func main() {
 	defer stop()
 	manager := collector.NewManager(store, log, collector.Schedule{Fast: cfg.FastInterval, Standard: cfg.StatsInterval, Slow: cfg.SlowInterval, Metadata: cfg.MetaInterval, Retention: cfg.Retention, FanoutLimit: cfg.FanoutDatabaseLimit})
 	go manager.Run(ctx)
-	authentication, err := auth.New(auth.Config{Store: store, Username: "admin", Password: cfg.AdminPassword, SecureCookies: cfg.SecureCookies, TrustedProxies: cfg.TrustedProxyCIDRs})
+	authentication, err := auth.New(auth.Config{Store: store, Username: "admin", Password: cfg.BootstrapAdminPassword, SecureCookies: cfg.SecureCookies, TrustedProxies: cfg.TrustedProxyCIDRs})
 	if err != nil {
 		log.Error("configure authentication", "error", err)
 		os.Exit(1)

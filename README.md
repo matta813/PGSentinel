@@ -33,7 +33,7 @@ Install Docker with the Compose v2 plugin, then run:
 curl -fsSL https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh | sh
 ```
 
-The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, starts it, and waits for a healthy service. It prints the generated administrator password once. Open <http://localhost:8080>, sign in, then add an existing PostgreSQL server under **Servers**. Re-running the installer preserves the existing `.env` and data volume.
+The installer downloads the [ready-to-run Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml), generates unique encryption and administrator secrets in `pgsentinel/.env`, pulls the published image, starts it, and waits for a healthy service. It prints the generated bootstrap password once. Open <http://localhost:8080>, sign in as `admin`, replace the bootstrap password when prompted, then add an existing PostgreSQL server under **Servers**. Re-running the installer preserves the existing `.env` and data volume.
 
 To inspect the files before starting instead:
 
@@ -96,7 +96,7 @@ After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and e
 | Variable | Default | Meaning |
 |---|---:|---|
 | `PGSENTINEL_ENCRYPTION_KEY` | required | Master secret used for AES-GCM credential encryption |
-| `PGSENTINEL_ADMIN_PASSWORD` | required | Administrator login password (minimum 12 characters) |
+| `PGSENTINEL_ADMIN_PASSWORD` | required | Initial password for the built-in `admin` user (minimum 12 characters); only used to bootstrap a new data volume |
 | `PGSENTINEL_SECURE_COOKIES` | `false` | Mark session cookies Secure; enable behind production HTTPS |
 | `PGSENTINEL_NOTIFICATION_ALLOWED_HOSTS` | empty | Exact comma-separated hosts allowed for private notification targets |
 | `PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS` | `false` | Permit every private notification target; prefer the host allowlist |
@@ -109,6 +109,10 @@ After restart: `CREATE EXTENSION pg_stat_statements;`. Absence is detected and e
 | `PGSENTINEL_TRUSTED_PROXY_CIDRS` | empty | Exact reverse-proxy CIDRs allowed to supply `X-Forwarded-For` |
 
 Passwords, tokens, and full connection URLs are never logged or returned by normal APIs. Normalized `pg_stat_statements.query` text can still contain literals for statements that PostgreSQL cannot normalize; treat database access as sensitive.
+
+### Administrator sign-in
+
+Every new data volume contains one built-in administrator account named `admin`. Its initial password comes from `PGSENTINEL_ADMIN_PASSWORD`. The first authenticated session is restricted to changing that password; monitoring data and settings remain unavailable until the change succeeds. PGSentinel stores the replacement as a salted Argon2id hash in SQLite and never returns or logs it. On existing volumes, changing `PGSENTINEL_ADMIN_PASSWORD` does not overwrite the persisted administrator password.
 
 ## Releases
 
