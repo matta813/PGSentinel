@@ -1,37 +1,50 @@
-import { useState } from 'react';
-import { Check, RotateCcw } from 'lucide-react';
-import { api, APIError } from '../api/client';
-import { Empty, ErrorState, Loading, SeverityBadge } from '../components/Status';
-import { useApi } from '../hooks/useApi';
-import type { Finding, Severity } from '../types';
+import { useEffect, useState } from 'react'
+import { Check, ChevronDown, Clock3, Filter, RotateCcw, Search } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { api, APIError } from '../api/client'
+import { Empty, ErrorState, Loading, SeverityBadge } from '../components/Status'
+import { Notice, PageHeader } from '../components/UI'
+import { useApi } from '../hooks/useApi'
+import type { Finding, Severity } from '../types'
 
 export function ProblemsPage() {
-  const [severity, setSeverity] = useState('');
-  const [status, setStatus] = useState('active');
-  const [category, setCategory] = useState('');
-  const [search, setSearch] = useState('');
-  const [message, setMessage] = useState('');
-  const query = new URLSearchParams({ status });
-  if (severity) query.set('severity', severity);
-  if (category.trim()) query.set('category', category.trim());
-  if (search.trim()) query.set('search', search.trim());
-  const { data, error, loading, reload } = useApi(() => api.get<Finding[]>(`/problems?${query}`), [status, severity, category, search]);
+  const [urlParams] = useSearchParams()
+  const [severity, setSeverity] = useState('')
+  const [status, setStatus] = useState('active')
+  const [category, setCategory] = useState('')
+  const [search, setSearch] = useState('')
+  const [message, setMessage] = useState('')
+  const selectedId = urlParams.get('id')
+  const query = new URLSearchParams({ status })
+  if (severity) query.set('severity', severity)
+  if (category.trim()) query.set('category', category.trim())
+  if (search.trim()) query.set('search', search.trim())
+  const { data, error, loading, reload } = useApi(() => api.get<Finding[]>(`/problems?${query}`), [status, severity, category, search])
+  useEffect(() => { if (selectedId && data) document.getElementById(`finding-${selectedId}`)?.scrollIntoView({ block: 'center' }) }, [data, selectedId])
   async function setFindingStatus(id: string, nextStatus: 'active' | 'acknowledged') {
-    setMessage('');
-    try { await api.put(`/problems/${id}/status`, { status: nextStatus }); void reload(); }
-    catch (e) { setMessage(e instanceof APIError ? `${e.message}: ${e.detail}` : 'Unable to update problem'); }
+    setMessage('')
+    try { await api.put(`/problems/${id}/status`, { status: nextStatus }); void reload() }
+    catch (reason) { setMessage(reason instanceof APIError ? `${reason.message}: ${reason.detail}` : 'Unable to update problem') }
   }
-  if (loading) return <Loading />;
-  if (error) return <ErrorState error={error} retry={reload} />;
+  if (loading) return <Loading />
+  if (error) return <ErrorState error={error} retry={reload} />
+  const filtersActive = Boolean(severity || category || search || status !== 'active')
   return <>
-    <div className="title-row"><div><p className="eyebrow">Problems inbox</p><h1>What needs attention</h1><p>Acknowledge investigated findings without hiding their health impact.</p></div></div>
-    {message && <div className="notice">{message}</div>}
-    <div className="filters">
-      <select aria-label="Severity" value={severity} onChange={e => setSeverity(e.target.value)}><option value="">All severities</option>{(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as Severity[]).map(s => <option key={s}>{s}</option>)}</select>
-      <select aria-label="Status" value={status} onChange={e => setStatus(e.target.value)}><option value="active">Active</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option><option value="all">All</option></select>
-      <input aria-label="Category" placeholder="Category" value={category} onChange={e => setCategory(e.target.value)} />
-      <input aria-label="Search problems" placeholder="Search title, evidence…" value={search} maxLength={200} onChange={e => setSearch(e.target.value)} />
+    <PageHeader title="Problems" description="Triage findings, inspect evidence, and track investigation state." actions={<span className="result-count">{data?.length ?? 0} {data?.length === 1 ? 'finding' : 'findings'}</span>} />
+    {message && <Notice tone="danger">{message}</Notice>}
+    <div className="problem-toolbar">
+      <label className="search-field"><Search /><span className="sr-only">Search problems</span><input aria-label="Search problems" placeholder="Search findings and evidence" value={search} maxLength={200} onChange={event => setSearch(event.target.value)} /></label>
+      <div className="filter-controls"><span className="filter-label"><Filter /> Filters</span><select aria-label="Severity" value={severity} onChange={event => setSeverity(event.target.value)}><option value="">All severities</option>{(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as Severity[]).map(item => <option key={item}>{item}</option>)}</select><select aria-label="Status" value={status} onChange={event => setStatus(event.target.value)}><option value="active">Active</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option><option value="all">All statuses</option></select><input className="category-filter" aria-label="Category" placeholder="Category" value={category} onChange={event => setCategory(event.target.value)} />{filtersActive && <button className="button ghost compact" onClick={() => { setSeverity(''); setStatus('active'); setCategory(''); setSearch('') }}>Clear</button>}</div>
     </div>
-    {data?.length === 0 ? <Empty title="Inbox is clear" detail="No problems match the selected filters." /> : <div className="inbox">{data?.map(f => <details key={f.id} className="finding"><summary><SeverityBadge severity={f.severity} /><div><strong>{f.title}</strong><span>{f.database || 'Server'}{f.resource && ` · ${f.resource}`} · {f.category} · {f.status}</span><p>{f.summary}</p></div></summary><div className="finding-detail"><h3>Why it matters</h3><p>{f.impact}</p><h3>Observed evidence</h3><div className="evidence">{f.evidence?.map(e => <div key={e.label}><span>{e.label}</span><strong>{e.value}</strong></div>)}</div><h3>Suggested investigation</h3><ol>{f.suggestions?.map((s, i) => <li key={i}>{s.title}{s.detail && <small>{s.detail}</small>}</li>)}</ol><p className="confidence">Confidence: <strong>{f.confidence}</strong></p>{f.status === 'active' && <button onClick={() => void setFindingStatus(f.id, 'acknowledged')}><Check /> Acknowledge</button>}{f.status === 'acknowledged' && <button className="secondary" onClick={() => void setFindingStatus(f.id, 'active')}><RotateCcw /> Reopen</button>}</div></details>)}</div>}
-  </>;
+    {data?.length === 0 ? <Empty title="No matching findings" detail="The operations inbox has no findings for the selected filters." /> : <div className="inbox" aria-label="Problem findings">{data?.map(finding => <FindingRow key={finding.id} finding={finding} defaultOpen={finding.id === selectedId} onStatus={setFindingStatus} />)}</div>}
+  </>
 }
+
+function FindingRow({ finding, defaultOpen, onStatus }: { finding: Finding; defaultOpen: boolean; onStatus: (id: string, status: 'active' | 'acknowledged') => Promise<void> }) {
+  return <details id={`finding-${finding.id}`} open={defaultOpen || undefined} className={`finding severity-${finding.severity.toLowerCase()}`}>
+    <summary><SeverityBadge severity={finding.severity} /><div className="finding-primary"><strong>{finding.title}</strong><span>{finding.database || 'Server scope'}{finding.resource && ` · ${finding.resource}`}</span></div><span className="finding-category">{finding.category}</span><span className={`finding-status ${finding.status}`}>{finding.status}</span><time dateTime={finding.updatedAt}><Clock3 />{relativeTime(finding.updatedAt)}</time><ChevronDown className="disclosure" /></summary>
+    <div className="finding-detail"><section><h3>What is wrong</h3><p>{finding.summary}</p>{finding.cause && <p>{finding.cause}</p>}</section><section><h3>Why it matters</h3><p>{finding.impact}</p></section><section className="finding-evidence"><h3>Evidence</h3><div className="evidence-grid">{finding.evidence?.map(item => <div key={item.label}><span>{item.label}</span><strong>{item.value}{item.unit && <small> {item.unit}</small>}</strong></div>)}</div></section><section><h3>What to investigate</h3><ol>{finding.suggestions?.map((suggestion, index) => <li key={index}><strong>{suggestion.title}</strong>{suggestion.detail && <p>{suggestion.detail}</p>}</li>)}</ol></section><footer><span>Confidence <strong>{finding.confidence}</strong></span>{finding.status === 'active' && <button className="button secondary" onClick={() => void onStatus(finding.id, 'acknowledged')}><Check /> Acknowledge</button>}{finding.status === 'acknowledged' && <button className="button secondary" onClick={() => void onStatus(finding.id, 'active')}><RotateCcw /> Reopen</button>}</footer></div>
+  </details>
+}
+
+function relativeTime(value: string) { const timestamp = new Date(value).getTime(); if (!Number.isFinite(timestamp)) return 'Unknown'; const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000)); if (minutes < 1) return 'Just now'; if (minutes < 60) return `${minutes}m ago`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours}h ago`; return `${Math.floor(hours / 24)}d ago` }
