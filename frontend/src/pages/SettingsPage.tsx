@@ -1,48 +1,23 @@
-import { FormEvent, useState } from 'react';
-import { Save, Send, Trash2 } from 'lucide-react';
-import { api, APIError } from '../api/client';
-import { useApi } from '../hooks/useApi';
-import type { NotificationDestination } from '../types/notifications';
+import { FormEvent, useState } from 'react'
+import { Bell, ExternalLink, Save, Send, Trash2 } from 'lucide-react'
+import { api, APIError } from '../api/client'
+import { Empty, ErrorState, Loading } from '../components/Status'
+import { Notice, PageHeader, SectionHeader } from '../components/UI'
+import { useApi } from '../hooks/useApi'
+import type { NotificationDestination } from '../types/notifications'
 
 export function SettingsPage() {
-  const destinations = useApi(() => api.get<NotificationDestination[]>('/notifications'), []);
-  const [provider, setProvider] = useState('ntfy');
-  const [name, setName] = useState('');
-  const [form, setForm] = useState({ serverUrl: 'https://ntfy.sh', topic: '', token: '', username: '', password: '', webhookUrl: '' });
-  const [status, setStatus] = useState('');
-  const payload = { name, provider, enabled: true, ...form };
-
-  async function test(e: FormEvent) {
-    e.preventDefault();
-    setStatus('Sending…');
-    try {
-      await api.post('/notifications/test', payload);
-      setStatus('Test notification delivered successfully.');
-    } catch (e) {
-      setStatus(e instanceof APIError ? `${e.message}: ${e.detail}` : 'Notification failed');
-    }
-  }
-  async function save() {
-    setStatus('Saving…');
-    try {
-      await api.post('/notifications', payload);
-      setName('');
-      setStatus('Notification destination saved securely.');
-      void destinations.reload();
-    } catch (e) {
-      setStatus(e instanceof APIError ? `${e.message}: ${e.detail}` : 'Unable to save destination');
-    }
-  }
-  return <>
-    <div className="title-row"><div><p className="eyebrow">Settings</p><h1>Notifications</h1><p>Save encrypted destinations and verify delivery before depending on alerts.</p></div></div>
-    <form className="settings-card" onSubmit={test}>
-      <label>Name<input required value={name} onChange={e => setName(e.target.value)} placeholder="Operations" /></label>
-      <label>Provider<select value={provider} onChange={e => setProvider(e.target.value)}><option value="ntfy">ntfy</option><option value="webhook">Generic webhook</option></select></label>
-      {provider === 'ntfy' ? <><label>Server URL<input type="url" required value={form.serverUrl} onChange={e => setForm({ ...form, serverUrl: e.target.value })} /></label><label>Topic<input required value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} /></label><label>Token (optional)<input type="password" value={form.token} onChange={e => setForm({ ...form, token: e.target.value })} /></label><label>Username (optional)<input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} /></label><label>Password (optional)<input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></label></> : <label>Webhook URL<input type="url" required value={form.webhookUrl} onChange={e => setForm({ ...form, webhookUrl: e.target.value })} /></label>}
-      <div className="form-actions"><button type="button" className="secondary" onClick={() => void save()}><Save /> Save destination</button><button type="submit"><Send /> Send test</button></div>
-      {status && <div className="notice">{status}</div>}
-    </form>
-    <div className="section-title"><h2>Saved destinations</h2></div>
-    <div className="server-table">{destinations.data?.map(destination => <article key={destination.id}><div><strong>{destination.name}</strong><span>{destination.provider} · {destination.enabled ? 'enabled' : 'disabled'}</span></div><button className="danger icon" title="Delete destination" onClick={async () => { if (confirm(`Delete ${destination.name}?`)) { await api.delete(`/notifications/${destination.id}`); void destinations.reload(); } }}><Trash2 /></button></article>)}</div>
-  </>;
+  const destinations = useApi(() => api.get<NotificationDestination[]>('/notifications'), [])
+  const [provider, setProvider] = useState('ntfy')
+  const [name, setName] = useState('')
+  const [form, setForm] = useState({ serverUrl: 'https://ntfy.sh', topic: '', token: '', username: '', password: '', webhookUrl: '' })
+  const [status, setStatus] = useState('')
+  const payload = { name, provider, enabled: true, ...form }
+  async function test(event: FormEvent) { event.preventDefault(); setStatus('Sending test notification…'); try { await api.post('/notifications/test', payload); setStatus('Test notification delivered successfully.') } catch (reason) { setStatus(reason instanceof APIError ? `${reason.message}: ${reason.detail}` : 'Notification failed') } }
+  async function save() { setStatus('Saving destination…'); try { await api.post('/notifications', payload); setName(''); setStatus('Notification destination saved securely.'); void destinations.reload() } catch (reason) { setStatus(reason instanceof APIError ? `${reason.message}: ${reason.detail}` : 'Unable to save destination') } }
+  if (destinations.loading) return <Loading />
+  if (destinations.error) return <ErrorState error={destinations.error} retry={destinations.reload} />
+  return <><PageHeader title="Settings" description="Configure alert delivery for this PGSentinel deployment." />
+    <div className="settings-layout"><aside className="settings-nav"><a className="active" href="#notifications"><Bell />Notifications</a></aside><div className="settings-content"><section id="notifications"><SectionHeader title="Notification destinations" description="Send findings to an existing ntfy topic or webhook endpoint." /><form className="settings-form" onSubmit={test}><div className="form-grid two"><label>Display name<input required value={name} onChange={event => setName(event.target.value)} placeholder="Database operations" /></label><label>Provider<select value={provider} onChange={event => setProvider(event.target.value)}><option value="ntfy">ntfy</option><option value="webhook">Generic webhook</option></select></label></div>{provider === 'ntfy' ? <div className="form-stack"><label>Server URL<input className="mono" type="url" required value={form.serverUrl} onChange={event => setForm({ ...form, serverUrl: event.target.value })} /></label><label>Topic<input className="mono" required value={form.topic} onChange={event => setForm({ ...form, topic: event.target.value })} /></label><div className="form-grid two"><label>Access token <small>Optional</small><input type="password" value={form.token} onChange={event => setForm({ ...form, token: event.target.value })} /></label><label>Username <small>Optional</small><input value={form.username} onChange={event => setForm({ ...form, username: event.target.value })} /></label></div><label>Password <small>Optional</small><input type="password" value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} /></label></div> : <label>Webhook URL<input className="mono" type="url" required value={form.webhookUrl} onChange={event => setForm({ ...form, webhookUrl: event.target.value })} /></label>}<div className="form-actions"><button type="button" className="button secondary" onClick={() => void save()}><Save /> Save destination</button><button type="submit" className="button primary"><Send /> Send test</button></div>{status && <Notice>{status}</Notice>}</form></section><section><SectionHeader title="Saved destinations" description="Credentials remain encrypted and are not displayed after saving." />{destinations.data?.length === 0 ? <Empty title="No notification destinations" detail="Configure a destination above to receive health alerts." /> : <div className="destination-list">{destinations.data?.map(destination => <article key={destination.id}><span className="destination-icon"><Bell /></span><div><strong>{destination.name}</strong><span>{destination.provider} · {destination.enabled ? 'Enabled' : 'Disabled'}</span></div><ExternalLink /><button className="icon-button danger" aria-label={`Delete ${destination.name}`} title="Delete destination" onClick={async () => { if (confirm(`Delete ${destination.name}?`)) { await api.delete(`/notifications/${destination.id}`); void destinations.reload() } }}><Trash2 /></button></article>)}</div>}</section></div></div>
+  </>
 }
