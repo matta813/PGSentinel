@@ -51,7 +51,7 @@ Minimal deployment:
 ```yaml
 services:
   pgsentinel:
-    image: ghcr.io/matta813/pgsentinel:0.4.0
+    image: ghcr.io/matta813/pgsentinel:0.5.0
     container_name: pgsentinel
     restart: unless-stopped
     read_only: true
@@ -68,7 +68,7 @@ services:
 
 The image runs as UID/GID `10001`; make bind-mounted `./data` writable by that identity.
 
-The repository Compose file defaults to the pinned `0.4.0` image. Set `PGSENTINEL_VERSION` to choose another release. Local source builds use the explicit development override:
+The repository Compose file defaults to the pinned `0.5.0` image. Set `PGSENTINEL_VERSION` to choose another release. Local source builds use the explicit development override:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
@@ -119,11 +119,11 @@ Every new data volume contains one built-in administrator account named `admin`.
 Completed pull requests are merged individually into protected `main`; `RELEASE` stays at the latest published version while changes accumulate. GitHub later builds the release notes from every merged pull request between the previous and new tags. To publish the accumulated work, change [`RELEASE`](RELEASE) to a greater Semantic Version in a dedicated release pull request:
 
 ```bash
-git switch -c release/0.4.0
-printf '0.4.0\n' > RELEASE
+git switch -c release/0.5.0
+printf '0.5.0\n' > RELEASE
 git add RELEASE
-git commit -m "chore: release 0.4.0"
-git push -u origin release/0.4.0
+git commit -m "chore: release 0.5.0"
+git push -u origin release/0.5.0
 gh pr create --base main --fill
 ```
 
@@ -132,7 +132,7 @@ After lint, tests and builds pass, GitHub Actions publishes the version, `v`-pre
 Pin production deployments to a version:
 
 ```bash
-docker pull ghcr.io/matta813/pgsentinel:0.4.0
+docker pull ghcr.io/matta813/pgsentinel:0.5.0
 ```
 
 `latest` is convenient for evaluation but moves on every stable release. See [release workflow, permissions, and troubleshooting](docs/releases.md).
