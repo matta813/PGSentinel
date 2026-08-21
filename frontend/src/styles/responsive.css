@@ -1,0 +1,69 @@
+@media (max-width: 1200px) {
+  .category-list { grid-template-columns: 1fr; }
+  .attention-row { grid-template-columns: 74px minmax(210px, 1fr) 1fr 18px; }
+  .finding > summary { grid-template-columns: 72px minmax(230px, 1fr) 100px 86px 18px; }
+  .finding time { display: none; }
+  .server-list-header, .server-row { grid-template-columns: minmax(220px, 1.2fr) 140px 96px 104px; }
+  .server-list-header span:nth-child(3), .server-row .server-property:nth-child(3) { display: none; }
+}
+@media (max-width: 900px) {
+  .app-shell { display: block; }
+  .sidebar { position: fixed; left: -250px; box-shadow: var(--floating-shadow); transition: left var(--transition); }
+  .sidebar.open { left: 0; }
+  .sidebar-close, .menu-button { display: inline-grid; }
+  .sidebar-close { margin-left: auto; }
+  .nav-scrim { position: fixed; inset: 0; z-index: 15; border: 0; background: rgba(2, 7, 10, .62); }
+  .topbar { padding: 0 var(--space-4); }
+  .page { padding: var(--space-6) var(--space-5) var(--space-10); }
+  .overview-top { grid-template-columns: 1fr 1fr; }
+  .category-health { grid-template-columns: 160px 1fr; }
+  .problem-toolbar { align-items: stretch; flex-direction: column; }
+  .search-field { width: 100%; }
+  .filter-controls { flex-wrap: wrap; }
+  .finding > summary { grid-template-columns: 72px minmax(180px, 1fr) 84px 18px; }
+  .finding-category { display: none; }
+  .finding-detail { padding: var(--space-5); grid-template-columns: 1fr; }
+  .server-list-header { display: none; }
+  .server-row { grid-template-columns: minmax(210px, 1fr) 100px 96px; padding: var(--space-3); }
+  .server-row .server-property:nth-child(2) { display: none; }
+  .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-left: 42px; }
+  .settings-layout { grid-template-columns: 1fr; gap: var(--space-5); }
+  .settings-nav { position: static; }
+}
+@media (max-width: 680px) {
+  .page { padding: var(--space-5) var(--space-4) var(--space-10); }
+  .page-header { min-height: 0; align-items: flex-start; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-5); }
+  .page-header h1 { font-size: 22px; }
+  .page-actions, .page-actions .button, .server-select { width: 100%; }
+  .page-actions { justify-content: space-between; }
+  .topbar-context > span, .topbar-context > svg, .topbar-status { display: none; }
+  .overview-top { grid-template-columns: 1fr; }
+  .health-score, .estate-summary { min-height: 160px; }
+  .category-health { grid-template-columns: 1fr; }
+  .category-heading { padding: var(--space-3) var(--space-4); border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+  .category-list { padding: var(--space-4); }
+  .attention-row { grid-template-columns: 70px minmax(0, 1fr) 18px; }
+  .attention-row > p { display: none; }
+  .overview-server { grid-template-columns: 30px minmax(0, 1fr) 94px; }
+  .server-version { display: none !important; }
+  .section-header { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
+  .filter-label, .category-filter { display: none; }
+  .filter-controls select { flex: 1; min-width: 112px; }
+  .finding > summary { grid-template-columns: 68px minmax(0, 1fr) 16px; gap: var(--space-2); }
+  .finding-status { display: none; }
+  .finding-detail { padding: var(--space-4); }
+  .evidence-grid { grid-template-columns: 1fr; }
+  .finding-detail footer { align-items: flex-start; flex-direction: column; gap: var(--space-3); }
+  .form-grid, .form-grid.two { grid-template-columns: 1fr; }
+  .server-row { grid-template-columns: minmax(0, 1fr) 90px; }
+  .server-row > .status-indicator { justify-self: end; }
+  .row-actions { padding-left: 0; }
+  .table-context > span { display: none; }
+  .empty-state { grid-template-columns: 30px minmax(0, 1fr); }
+  .empty-action { grid-column: 2; justify-self: start; }
+  .auth-screen { padding: var(--space-5); }
+  .auth-card { padding: var(--space-5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
