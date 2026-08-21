@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/storage"
@@ -22,16 +23,25 @@ func testAPI(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	manager, err := auth.New(auth.Config{Password: "a-secure-test-password"})
+	manager, err := auth.New(auth.Config{Store: s, Username: "admin", Password: "a-secure-test-password"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	handler := New(s, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{Auth: manager}).Handler()
 	capture := httptest.NewRecorder()
-	if err := manager.Start(capture); err != nil {
+	user, err := manager.Authenticate(context.Background(), "admin", "a-secure-test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Start(capture, user); err != nil {
 		t.Fatal(err)
 	}
 	cookie := capture.Result().Cookies()[0]
+	change := httptest.NewRequest(http.MethodPut, "/api/v1/auth/password", nil)
+	change.AddCookie(cookie)
+	if err := manager.ChangePassword(context.Background(), change, "a-secure-test-password", "a-replacement-test-password"); err != nil {
+		t.Fatal(err)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/v1/") && r.URL.Path != "/api/v1/auth/login" && r.URL.Path != "/api/v1/version" {
 			r.AddCookie(cookie)
@@ -46,7 +56,7 @@ func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	manager, err := auth.New(auth.Config{Password: "a-secure-test-password"})
+	manager, err := auth.New(auth.Config{Store: s, Username: "admin", Password: "a-secure-test-password"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,17 +68,34 @@ func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
 		t.Fatalf("unauthenticated=%d", r.Code)
 	}
 	r = httptest.NewRecorder()
-	handler.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"password":"a-secure-test-password"}`)))
+	handler.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"username":"admin","password":"a-secure-test-password"}`)))
 	if r.Code != http.StatusOK || len(r.Result().Cookies()) != 1 {
 		t.Fatalf("login=%d %s", r.Code, r.Body.String())
 	}
 	cookie := r.Result().Cookies()[0]
+	if !strings.Contains(r.Body.String(), `"mustChangePassword":true`) || !strings.Contains(r.Body.String(), `"username":"admin"`) {
+		t.Fatalf("login state=%s", r.Body.String())
+	}
+	blocked := httptest.NewRequest(http.MethodGet, "/api/v1/servers", nil)
+	blocked.AddCookie(cookie)
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, blocked)
+	if r.Code != http.StatusForbidden {
+		t.Fatalf("first-login access=%d %s", r.Code, r.Body.String())
+	}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
 	req.AddCookie(cookie)
 	r = httptest.NewRecorder()
 	handler.ServeHTTP(r, req)
 	if r.Code != http.StatusOK {
 		t.Fatalf("session=%d", r.Code)
+	}
+	change := httptest.NewRequest(http.MethodPut, "/api/v1/auth/password", strings.NewReader(`{"currentPassword":"a-secure-test-password","newPassword":"a-new-secure-password"}`))
+	change.AddCookie(cookie)
+	r = httptest.NewRecorder()
+	handler.ServeHTTP(r, change)
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"mustChangePassword":false`) {
+		t.Fatalf("password change=%d %s", r.Code, r.Body.String())
 	}
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
 	req.AddCookie(cookie)

@@ -36,7 +36,7 @@ curl --fail http://127.0.0.1:8080/ready
 
 Open `http://localhost:8080` and add an existing PostgreSQL target under **Servers**. Across Docker networks, use a DNS name or IP reachable from the PGSentinel container; `localhost` inside the container refers to PGSentinel itself.
 
-If an installer run is interrupted, run the same command again. The existing `.env` is retained. To recover the generated administrator password locally, read `PGSENTINEL_ADMIN_PASSWORD` from that protected file; never paste it into an issue or log.
+If an installer run is interrupted, run the same command again. The existing `.env` is retained. Before the initial password change, recover the generated bootstrap password locally from `PGSENTINEL_ADMIN_PASSWORD` in that protected file; never paste it into an issue or log. After the first login, the replacement password is not recoverable from `.env`.
 
 The generated `pgsentinel/.env` defaults to host port `8080` and timezone `UTC`. Edit `PGSENTINEL_PORT` or `TZ` there before recreating the service if different values are required. Set `PGSENTINEL_SECURE_COOKIES=true` when the browser reaches PGSentinel exclusively through HTTPS. The Quickstart uses the named volume `pgsentinel-data`; removing the container does not remove that volume, but `docker compose down --volumes` does.
 
@@ -75,7 +75,7 @@ To restore, stop the service, copy the database back, and start it again. Preser
 
 - Keep the root filesystem read-only, drop all Linux capabilities, enable `no-new-privileges`, and mount only `/data` writable. The supplied Compose service configures these controls and a small non-executable `/tmp` tmpfs.
 - Keep `PGSENTINEL_ENCRYPTION_KEY` outside Compose files and source control.
-- Keep `PGSENTINEL_ADMIN_PASSWORD` outside Compose files and source control. PGSentinel stores only hashed, short-lived session tokens in memory.
+- Keep `PGSENTINEL_ADMIN_PASSWORD` outside Compose files and source control. It bootstraps the built-in `admin` user only when the data volume has no user record. PGSentinel persists only a salted Argon2id password hash and stores hashed, short-lived session tokens in memory.
 - Publish port `8080` only to a trusted management network or place it behind an authenticated TLS reverse proxy.
 - Restrict outbound network access to monitored PostgreSQL servers and configured notification endpoints.
 - Use `verify-full` for PostgreSQL connections across untrusted networks.
@@ -83,7 +83,7 @@ To restore, stop the service, copy the database back, and start it again. Preser
 - Pin the container to a release version and review release notes before upgrading.
 - Back up `/data` and monitor both `/health` and `/ready`.
 
-PGSentinel requires an administrator login and rate-limits failed attempts. Put it behind HTTPS and set `PGSENTINEL_SECURE_COOKIES=true`; network-level access control remains recommended.
+PGSentinel requires username-and-password authentication and rate-limits failed attempts. A new volume starts with the documented username `admin` and requires an immediate password change using the bootstrap password from `PGSENTINEL_ADMIN_PASSWORD`. Put it behind HTTPS and set `PGSENTINEL_SECURE_COOKIES=true`; network-level access control remains recommended.
 
 Sessions are intentionally held in memory for this single-instance release. Restarting PGSentinel signs every administrator out, and multiple replicas do not share sessions. When a reverse proxy connects to PGSentinel, configure only its exact network ranges so login limits apply to the originating client instead of the proxy:
 

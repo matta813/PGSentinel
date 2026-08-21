@@ -2,6 +2,16 @@ package models
 
 import "time"
 
+type User struct {
+	ID                 string
+	Username           string
+	PasswordHash       []byte
+	PasswordSalt       []byte
+	MustChangePassword bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type Severity string
 
 const (

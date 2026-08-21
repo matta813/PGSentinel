@@ -14,7 +14,7 @@ type Config struct {
 	DataDir                         string
 	DatabasePath                    string
 	EncryptionKey                   string
-	AdminPassword                   string
+	BootstrapAdminPassword          string
 	SecureCookies                   bool
 	AllowPrivateNotificationTargets bool
 	NotificationAllowedHosts        []string
@@ -34,7 +34,7 @@ func Load() (Config, error) {
 	c := Config{
 		ListenAddr: env("PGSENTINEL_LISTEN_ADDR", ":8080"), DataDir: dataDir,
 		DatabasePath:  filepath.Join(dataDir, "pgsentinel.db"),
-		EncryptionKey: os.Getenv("PGSENTINEL_ENCRYPTION_KEY"), AdminPassword: os.Getenv("PGSENTINEL_ADMIN_PASSWORD"), LogLevel: env("PGSENTINEL_LOG_LEVEL", "info"),
+		EncryptionKey: os.Getenv("PGSENTINEL_ENCRYPTION_KEY"), BootstrapAdminPassword: os.Getenv("PGSENTINEL_ADMIN_PASSWORD"), LogLevel: env("PGSENTINEL_LOG_LEVEL", "info"),
 		SecureCookies: boolean("PGSENTINEL_SECURE_COOKIES", false), AllowPrivateNotificationTargets: boolean("PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS", false),
 		NotificationAllowedHosts: list("PGSENTINEL_NOTIFICATION_ALLOWED_HOSTS"),
 		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
@@ -50,7 +50,7 @@ func Load() (Config, error) {
 	if len(c.EncryptionKey) < 32 {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY must contain at least 32 characters")
 	}
-	if len(c.AdminPassword) < 12 {
+	if len(c.BootstrapAdminPassword) < 12 {
 		return Config{}, fmt.Errorf("PGSENTINEL_ADMIN_PASSWORD must contain at least 12 characters")
 	}
 	if err := os.MkdirAll(c.DataDir, 0o750); err != nil {

@@ -51,6 +51,7 @@ func (a *API) routes() {
 	a.mux.HandleFunc("POST /api/v1/auth/login", a.login)
 	a.mux.HandleFunc("GET /api/v1/auth/session", a.session)
 	a.mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
+	a.mux.HandleFunc("PUT /api/v1/auth/password", a.changePassword)
 	a.mux.HandleFunc("GET /api/v1/servers", a.listServers)
 	a.mux.HandleFunc("POST /api/v1/servers", a.createServer)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}", a.getServer)
