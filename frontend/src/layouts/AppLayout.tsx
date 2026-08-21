@@ -11,7 +11,7 @@ const groups = [
 ] as const
 const routeNames: Record<string, string> = { '/': 'Overview', '/problems': 'Problems', '/servers': 'Servers', '/queries': 'Queries', '/tables': 'Tables', '/indexes': 'Indexes', '/vacuum': 'Vacuum', '/locks': 'Locks', '/settings': 'Settings' }
 
-export function AppLayout({ onLogout }: { onLogout: () => void }) {
+export function AppLayout({ username, onLogout }: { username: string; onLogout: () => void }) {
   const [open, setOpen] = useState(false)
   const [dark, setDark] = useState(() => localStorage.theme !== 'light')
   const { pathname } = useLocation()
@@ -26,7 +26,7 @@ export function AppLayout({ onLogout }: { onLogout: () => void }) {
       <div className="sidebar-footer"><div className="monitoring-state"><span className="live-dot" /><strong>Collector online</strong></div><div className="build-meta"><span>v{build?.version ?? 'dev'}</span>{build?.commit !== 'unknown' && build?.commit && <code>{build.commit.slice(0, 8)}</code>}</div></div>
     </aside>
     <main className="app-main">
-      <header className="topbar"><div className="topbar-context"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setOpen(true)}><Menu /></button><span>PGSentinel</span><ChevronRight /><strong>{routeNames[pathname] ?? 'Database'}</strong></div><div className="topbar-actions"><span className="topbar-status"><i />Live</span><span className="topbar-divider" /><button className="icon-button" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`} title="Toggle color theme" onClick={() => setDark(value => !value)}>{dark ? <Sun /> : <Moon />}</button><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void logout()}><LogOut /></button></div></header>
+      <header className="topbar"><div className="topbar-context"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setOpen(true)}><Menu /></button><span>PGSentinel</span><ChevronRight /><strong>{routeNames[pathname] ?? 'Database'}</strong></div><div className="topbar-actions"><span className="topbar-status"><i />Live</span><span className="topbar-divider" /><span className="account-label">{username}</span><button className="icon-button" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`} title="Toggle color theme" onClick={() => setDark(value => !value)}>{dark ? <Sun /> : <Moon />}</button><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => void logout()}><LogOut /></button></div></header>
       <div className="page"><Outlet /></div>
     </main>
   </div>

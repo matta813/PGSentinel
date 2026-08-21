@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 function mockSession(authenticated: boolean) {
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     if (String(input) === '/api/v1/auth/session') {
-      return Promise.resolve(new Response(JSON.stringify({ authenticated }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      return Promise.resolve(new Response(JSON.stringify({ authenticated, username: 'admin', mustChangePassword: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     return Promise.resolve(new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } }))
   })

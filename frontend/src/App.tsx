@@ -8,16 +8,19 @@ import { ProblemsPage } from './pages/ProblemsPage'
 import { ResourcePage } from './pages/ResourcePage'
 import { ServersPage } from './pages/ServersPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
+import type { AuthSession } from './types/auth'
 
 export function App() {
-  const [authentication, setAuthentication] = useState<'loading' | 'authenticated' | 'anonymous'>('loading')
+  const [authentication, setAuthentication] = useState<'loading' | 'anonymous' | AuthSession>('loading')
   useEffect(() => {
-    api.get<{ authenticated: boolean }>('/auth/session').then((r) => setAuthentication(r.authenticated ? 'authenticated' : 'anonymous')).catch(() => setAuthentication('anonymous'))
+    api.get<AuthSession>('/auth/session').then((session) => setAuthentication(session.authenticated ? session : 'anonymous')).catch(() => setAuthentication('anonymous'))
     const expired = () => setAuthentication('anonymous')
     window.addEventListener('pgsentinel:unauthorized', expired)
     return () => window.removeEventListener('pgsentinel:unauthorized', expired)
   }, [])
   if (authentication === 'loading') return <div className="auth-screen"><div className="auth-loading">Loading PGSentinel…</div></div>
-  if (authentication === 'anonymous') return <LoginPage onAuthenticated={() => setAuthentication('authenticated')} />
-  return <Routes><Route element={<AppLayout onLogout={() => setAuthentication('anonymous')} />}><Route index element={<OverviewPage />} /><Route path="problems" element={<ProblemsPage />} /><Route path="servers" element={<ServersPage />} /><Route path=":resource" element={<ResourcePage />} /><Route path="settings" element={<SettingsPage />} /></Route></Routes>
+  if (authentication === 'anonymous') return <LoginPage onAuthenticated={setAuthentication} />
+  if (authentication.mustChangePassword) return <ChangePasswordPage username={authentication.username} onChanged={() => setAuthentication({ ...authentication, mustChangePassword: false })} onLogout={() => setAuthentication('anonymous')} />
+  return <Routes><Route element={<AppLayout username={authentication.username} onLogout={() => setAuthentication('anonymous')} />}><Route index element={<OverviewPage />} /><Route path="problems" element={<ProblemsPage />} /><Route path="servers" element={<ServersPage />} /><Route path=":resource" element={<ResourcePage />} /><Route path="settings" element={<SettingsPage />} /></Route></Routes>
 }
