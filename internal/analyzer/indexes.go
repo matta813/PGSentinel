@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"github.com/matta813/pgsentinel/internal/models"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
-var indexBody = regexp.MustCompile(`(?i) USING \w+ \(([^)]+)\)(?: INCLUDE \(([^)]+)\))?(?: WHERE (.+))?$`)
+var indexBody = regexp.MustCompile(`(?i) USING (\w+) \(([^)]+)\)(?: INCLUDE \(([^)]+)\))?(?: WHERE (.+))?$`)
 
 func IndexFindings(serverID string, indexes []models.IndexStat) []models.Finding {
 	out := []models.Finding{}
@@ -18,7 +19,7 @@ func IndexFindings(serverID string, indexes []models.IndexStat) []models.Finding
 		}
 		m := indexBody.FindStringSubmatch(i.Definition)
 		if len(m) > 0 {
-			key := i.Database + "/" + i.Schema + "/" + i.Table + "/" + strings.Join(m[1:], "|")
+			key := i.Database + "/" + i.Schema + "/" + i.Table + "/" + strconv.FormatBool(i.Unique) + "/" + strings.Join(m[1:], "|")
 			groups[key] = append(groups[key], i)
 		}
 	}
