@@ -12,7 +12,7 @@ export function OverviewPage() {
   if (loading) return <Loading />
   if (error || !data) return <ErrorState error={error ?? new Error('No data')} retry={reload} />
   const urgent = (data.counts.CRITICAL ?? 0) + (data.counts.HIGH ?? 0)
-  const connected = data.servers.filter(server => !['unreachable', 'error', 'disconnected'].includes(server.status.toLowerCase())).length
+  const connected = data.servers.filter(server => server.status.toLowerCase() === 'healthy').length
   const lastCollection = data.servers.map(server => server.lastConnectedAt).filter(Boolean).sort().at(-1)
   return <>
     <PageHeader title="Overview" description="Infrastructure health across your PostgreSQL estate." meta={lastCollection ? `Last collection ${relativeTime(lastCollection)}` : 'Awaiting first collection'} />
