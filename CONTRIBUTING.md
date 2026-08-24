@@ -113,7 +113,7 @@ When reviewing:
 ## Release process
 
 1. Create `release/x.y.z` branch from `main`
-2. Update `RELEASE` file with new semantic version
+2. Update `RELEASE`, Compose image pins, `.env.example`, and version-specific deployment examples
 3. Open PR targeting `main`
 4. After CI passes and approval, merge
 5. GitHub Actions builds, publishes, and creates release
