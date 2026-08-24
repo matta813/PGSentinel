@@ -1,0 +1,62 @@
+name: Weekly growth report
+
+on:
+  schedule:
+    - cron: "17 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Download previous snapshot when available
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/weekly-growth-report.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0].id // empty')
+          if [ -z "$run_id" ]; then
+            echo "No previous successful weekly report is available; deltas will be omitted."
+            exit 0
+          fi
+          artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts" --jq '.artifacts[] | select(.name == "weekly-growth-report") | .id' | head -n 1)
+          if [ -z "$artifact_id" ]; then
+            echo "The previous run has no retained snapshot artifact; deltas will be omitted."
+            exit 0
+          fi
+          if ! gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > previous.zip; then
+            echo "The previous artifact is unavailable or expired; deltas will be omitted."
+            exit 0
+          fi
+          if ! unzip -p previous.zip growth-snapshot.json > previous-growth-snapshot.json; then
+            echo "The previous artifact has no readable snapshot; deltas will be omitted."
+            rm -f previous-growth-snapshot.json
+          fi
+      - name: Generate weekly report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          previous_args=()
+          if [ -s previous-growth-snapshot.json ]; then
+            previous_args=(--previous previous-growth-snapshot.json)
+          fi
+          python3 scripts/generate-weekly-growth-report.py \
+            --repository "$GITHUB_REPOSITORY" \
+            "${previous_args[@]}" \
+            --report weekly-growth-report.md \
+            --snapshot growth-snapshot.json
+          cat weekly-growth-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: weekly-growth-report
+          path: |
+            weekly-growth-report.md
+            growth-snapshot.json
+          if-no-files-found: error
+          retention-days: 90

@@ -25,6 +25,9 @@ jobs:
           SKIP_REMOTE_CHECK=true ./scripts/validate-release.sh RELEASE
           ./scripts/test-release.sh
           ./scripts/test-release-notes.sh
+          ./scripts/test-release-announcement.sh
+          python3 ./scripts/test-weekly-growth-report.py
+          python3 ./scripts/check-markdown-links.py
           ./scripts/test-github-workflows.sh
           ./scripts/test-compose.sh
 

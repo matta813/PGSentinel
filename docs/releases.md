@@ -35,6 +35,22 @@ The release workflow asks GitHub to generate notes for the exact range between t
 
 PGSentinel then formats those entries into a Jellyfin-inspired release page with a launch heading, upgrade reminder, counted changelog, and emoji categories for Security, Features, Bug fixes, Performance, Documentation, Dependencies, Tests, Maintenance, and General Changes. Conventional pull request titles such as `feat:`, `fix(security):`, `perf:`, `docs:`, and `chore(deps):` determine the category; unmatched titles appear under General Changes. Apply the `skip-changelog` label before merging a pull request that should not appear in release notes.
 
+### Announcement draft
+
+After publication, maintainers can turn the actual GitHub release body into a human-reviewable announcement draft:
+
+```bash
+gh release view v0.6.0 --json body --jq .body > /tmp/pgsentinel-0.6.0-notes.md
+python3 scripts/generate-release-announcement.py \
+  --version 0.6.0 \
+  --title 'PGSentinel v0.6.0' \
+  --notes /tmp/pgsentinel-0.6.0-notes.md \
+  --release-url https://github.com/matta813/PGSentinel/releases/tag/v0.6.0 \
+  --output /tmp/pgsentinel-0.6.0-announcement.md
+```
+
+The output includes install and upgrade guidance, short social copy, a project Discussion draft, and a longer community post. The [announcement workflow](../.github/workflows/release-announcement.yml) prepares the same file as a downloadable artifact after the protected release workflow succeeds. It never publishes externally: a maintainer must verify claims, choose an appropriate channel, and approve the final wording. See the [organic growth guide](growth.md) for the weekly reporting workflow and content principles.
+
 ## Image tags
 
 Stable `0.4.2` produces `ghcr.io/matta813/pgsentinel:0.4.2`, `:v0.4.2`, and `:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
