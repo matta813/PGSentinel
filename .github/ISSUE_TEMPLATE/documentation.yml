@@ -1,0 +1,34 @@
+name: Documentation improvement
+description: Report unclear, missing, or incorrect PGSentinel documentation
+title: "docs: "
+labels: ["documentation", "status: needs triage"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Link the page or name the section that needs attention.
+      placeholder: docs/deployment.md#data-and-backups
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is unclear or incorrect?
+      description: Explain what you tried, what the documentation led you to expect, and where you became blocked.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: Optional wording, examples, or missing context that would have helped.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for the same documentation problem.
+          required: true
+        - label: I removed credentials, private URLs, and sensitive database information.
+          required: true
