@@ -208,6 +208,11 @@ func (m *Manager) ChangePassword(ctx context.Context, r *http.Request, currentPa
 	if !ok {
 		return ErrInvalidCredentials
 	}
+	cookie, err := r.Cookie(CookieName)
+	if err != nil || cookie.Value == "" {
+		return ErrInvalidCredentials
+	}
+	currentToken := sha256.Sum256([]byte(cookie.Value))
 	user, err := m.Authenticate(ctx, session.Username, currentPassword)
 	if err != nil {
 		return ErrInvalidCredentials
@@ -222,11 +227,6 @@ func (m *Manager) ChangePassword(ctx context.Context, r *http.Request, currentPa
 	if err := m.store.UpdateUserPassword(ctx, user.ID, derivePassword(newPassword, salt), salt); err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
-	cookie, err := r.Cookie(CookieName)
-	if err != nil || cookie.Value == "" {
-		return ErrInvalidCredentials
-	}
-	currentToken := sha256.Sum256([]byte(cookie.Value))
 	m.mu.Lock()
 	for token, active := range m.sessions {
 		if active.UserID != user.ID {
