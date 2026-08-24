@@ -31,13 +31,13 @@ func (s *Store) SaveMetrics(ctx context.Context, metrics []models.Metric) error 
 }
 
 func (s *Store) ListMetrics(ctx context.Context, serverID, name string, from time.Time, limit int) ([]models.Metric, error) {
-	query := `SELECT server_id,database_name,name,value,labels_json,collected_at FROM metrics WHERE server_id=? AND name=?`
+	query := `SELECT server_id,database_name,name,value,labels_json,collected_at FROM (SELECT id,server_id,database_name,name,value,labels_json,collected_at FROM metrics WHERE server_id=? AND name=?`
 	args := []any{serverID, name}
 	if !from.IsZero() {
 		query += ` AND collected_at>=?`
 		args = append(args, from.UTC().Format(time.RFC3339Nano))
 	}
-	query += ` ORDER BY collected_at ASC LIMIT ?`
+	query += ` ORDER BY collected_at DESC,id DESC LIMIT ?) ORDER BY collected_at ASC,id ASC`
 	args = append(args, limit)
 	rows, err := s.DB.QueryContext(ctx, query, args...)
 	if err != nil {
