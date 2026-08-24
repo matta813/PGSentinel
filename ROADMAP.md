@@ -12,18 +12,19 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Multi-server management with tags, SSL modes, connection diagnostics, credential rotation, and encrypted notification destinations.
 - A persistent administrator account, forced bootstrap-password replacement, hardened sessions, bounded API input, and SSRF-aware notification target policy.
 - A responsive light/dark interface, one-command Compose installer, hardened container defaults, protected CI, and automated release publication.
+- Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
 
 ## Now
 
-### Deliver findings, not just notification tests
+### Add notification routing controls
 
 - Persist alert-routing rules that map finding severity, category, server tags, and lifecycle transitions to notification destinations.
-- Dispatch active, reopened, acknowledged, and resolved transitions with deduplication, cooldowns, bounded retries, and auditable delivery state.
+- Add cooldowns and operator-visible delivery history to the existing deduplicated, bounded transition delivery.
 - Make routing failures visible without blocking collection or analyzer progress.
 
-### Add replication and write-path health
+### Extend replication and write-path health
 
-- Collect and explain streaming replication state, replay lag, replication slots, retained WAL, archiving failures, and checkpoint pressure across PostgreSQL 15+.
+- Extend the shipped streaming state, lag, slot retention, and checkpoint rules with archiving failures and WAL generation trends.
 - Distinguish primary, standby, and intentionally delayed-replica behavior before assigning severity.
 - Keep every finding read-only, version-aware, and backed by the exact PostgreSQL evidence used to produce it.
 
@@ -33,9 +34,9 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Surface partial collections and stale snapshots in the API and UI so cached evidence cannot be mistaken for current evidence.
 - Include freshness in confidence and health calculations without resolving findings merely because a collector temporarily failed.
 
-### Evaluate query regressions continuously
+### Expand query regression context
 
-- Turn the existing baseline primitives and metric history into guarded per-query regression evaluation.
+- Retain longer regression windows and correlate the shipped interval-delta findings with deployments and configuration history.
 - Account for `pg_stat_statements` resets, minimum sample sizes, workload volume, and natural variance before creating a finding.
 - Explain the compared windows and contributing impact signals rather than presenting a context-free percentage.
 

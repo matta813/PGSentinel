@@ -18,6 +18,12 @@ Collectors are read-only and set `application_name=pgsentinel`. The scheduler cu
 
 Analyzer rules are pure transformations from snapshots to findings. A fingerprint derived from rule, server, database and resource gives an issue stable identity. Storage upserts matching issues, resolves disappeared issues and reopens recurring ones. No analyzer performs a database mutation.
 
+High and Critical finding lifecycle transitions are queued transactionally in SQLite for every notification destination that is enabled at that moment. New, severity-increased, reopened and resolved events are delivered independently per destination; successful deliveries are not repeated, while failed deliveries are attempted at most three times on later collection cycles. Lower-severity findings remain in the operations inbox to avoid noisy default alerting. Notifications include concise finding context and never contain stored destination credentials.
+
+Replication collection uses `pg_is_in_recovery()` to select role-appropriate evidence. Primaries read `pg_stat_replication` and `pg_replication_slots`; replicas read `pg_stat_wal_receiver`. Checkpoint counters come from `pg_stat_bgwriter` on PostgreSQL 15–16 and `pg_stat_checkpointer` on PostgreSQL 17+. All queries use the existing read-only monitoring connection.
+
+The latest raw evidence is available from `GET /api/v1/servers/{id}/replication` and `GET /api/v1/servers/{id}/wal` for authenticated operator tooling. The problem inbox remains the primary UI and exposes only evidence that crossed a documented rule threshold.
+
 ## EXPLAIN safety boundary
 
 A future endpoint can accept explicit `EXPLAIN (FORMAT JSON)` for validated read-only statements. It must parse/reject multiple or mutating statements, use a read-only transaction with timeout, and audit the request. `EXPLAIN ANALYZE` requires a separate explicit warning and is never scheduled because it executes the statement.

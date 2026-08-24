@@ -157,6 +157,30 @@ func TestIncompleteCollectionDoesNotResolveExistingFindings(t *testing.T) {
 	}
 }
 
+func TestIncompleteCollectionIsDegradedRatherThanHealthy(t *testing.T) {
+	status, detail := collectionOutcome(false)
+	if status != "degraded" || detail == "" {
+		t.Fatalf("status=%q detail=%q", status, detail)
+	}
+	status, detail = collectionOutcome(true)
+	if status != "healthy" || detail != "" {
+		t.Fatalf("status=%q detail=%q", status, detail)
+	}
+}
+
+func TestMissingFallbackSnapshotKeepsCollectionIncomplete(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "missing-snapshot.db"), "long-enough-encryption-key-32-chars")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	manager := NewManager(store, slog.New(slog.NewTextHandler(io.Discard, nil)), Schedule{})
+	var value []models.QueryStat
+	if manager.restoreSnapshot(context.Background(), "missing", "queries", &value) {
+		t.Fatal("missing cached data was treated as complete")
+	}
+}
+
 func TestCoreCollectionFailureReplacesStaleHealthyStatus(t *testing.T) {
 	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long-enough-encryption-key-32-chars")
 	if err != nil {

@@ -56,6 +56,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 ### PostgreSQL visibility
 
 - Connections, transactions, databases, locks, tables, vacuum, indexes, and configuration
+- Role-aware replication, WAL retention, and checkpoint-pressure findings
 - Per-database table and index collection across a configurable number of databases
 - `pg_stat_statements` query load and multi-factor Query Impact Score
 - Duplicate and potentially unused index candidates with supporting evidence
@@ -65,6 +66,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 - Multiple PostgreSQL targets, tags, SSL modes, and connection diagnostics
 - Searchable operations inbox and 30-day raw snapshot retention by default
 - Encrypted ntfy and generic webhook destinations with delivery tests
+- Dedupe-safe notifications for new, escalated, reopened, and resolved High/Critical findings
 - Low-cardinality Prometheus metrics plus health and readiness endpoints
 
 ### Security and deployment

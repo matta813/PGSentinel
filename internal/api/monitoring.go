@@ -123,11 +123,24 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 	for _, f := range findings {
 		counts[f.Severity]++
 	}
-	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": analyzer.HealthScore(findings)})
+	score := analyzer.HealthScore(findings)
+	for _, server := range servers {
+		switch server.Status {
+		case "unreachable", "error":
+			if score.Overall > 50 {
+				score.Overall = 50
+			}
+		case "degraded", "unknown":
+			if score.Overall > 75 {
+				score.Overall = 75
+			}
+		}
+	}
+	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score})
 }
 func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 	id, resource := r.PathValue("id"), r.PathValue("resource")
-	allowed := map[string]string{"metrics": "core", "databases": "core", "connections": "core", "queries": "queries", "tables": "tables", "indexes": "indexes", "locks": "locks", "configuration": "configuration", "vacuum": "tables"}
+	allowed := map[string]string{"metrics": "core", "databases": "core", "connections": "core", "queries": "queries", "tables": "tables", "indexes": "indexes", "locks": "locks", "configuration": "configuration", "vacuum": "tables", "replication": "replication", "wal": "wal"}
 	kind, ok := allowed[resource]
 	if !ok {
 		failure(w, 404, "Resource not found", nil)
@@ -147,6 +160,10 @@ func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 		value = &[]models.LockInfo{}
 	case "configuration":
 		value = &map[string]string{}
+	case "replication":
+		value = &models.ReplicationStats{}
+	case "wal":
+		value = &models.WALStats{}
 	}
 	if err := a.store.LatestSnapshot(r.Context(), id, kind, value); err == sql.ErrNoRows {
 		write(w, 200, value)

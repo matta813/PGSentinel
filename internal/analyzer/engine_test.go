@@ -3,6 +3,7 @@ package analyzer
 import (
 	"github.com/matta813/pgsentinel/internal/models"
 	"testing"
+	"time"
 )
 
 func TestConnectionAndVacuumRules(t *testing.T) {
@@ -13,6 +14,26 @@ func TestConnectionAndVacuumRules(t *testing.T) {
 	}
 	if got[0].Severity != models.SeverityCritical {
 		t.Fatalf("expected critical, got %s", got[0].Severity)
+	}
+}
+
+func TestReplicationAndCheckpointRulesAreRoleAware(t *testing.T) {
+	base := models.Snapshot{ServerID: "s", Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}}
+	replica := base
+	replica.Replication.InRecovery = true
+	if got := New(DefaultThresholds()).Analyze(replica); !rulePresent(got, "wal-receiver-disconnected") {
+		t.Fatal("recovery server without receiver must be visible")
+	}
+	primary := base
+	primary.Replication.Standbys = []models.ReplicationStandby{{Application: "replica-1", State: "streaming", ReplayLagSeconds: 90}}
+	primary.Replication.Slots = []models.ReplicationSlot{{Name: "abandoned", Active: false, RetainedBytes: 2 * 1024 * 1024 * 1024}}
+	reset := time.Now().Add(-20 * time.Minute)
+	primary.WAL = models.WALStats{TimedCheckpoints: 8, RequestedCheckpoints: 12, StatsReset: &reset}
+	got := New(DefaultThresholds()).Analyze(primary)
+	for _, rule := range []string{"standby-replay-lag", "inactive-slot-wal", "requested-checkpoints", "checkpoint-frequency"} {
+		if !rulePresent(got, rule) {
+			t.Fatalf("expected %s finding", rule)
+		}
 	}
 }
 func TestHealthScoreWeightsSeverity(t *testing.T) {

@@ -93,6 +93,11 @@ type NotificationDestination struct {
 	CreatedAt time.Time         `json:"createdAt"`
 	UpdatedAt time.Time         `json:"updatedAt"`
 }
+type FindingNotificationDelivery struct {
+	EventID, DestinationID, EventType string
+	Finding                           Finding
+	Attempts                          int
+}
 type Snapshot struct {
 	ServerID      string            `json:"serverId"`
 	CollectedAt   time.Time         `json:"collectedAt"`
@@ -106,6 +111,32 @@ type Snapshot struct {
 	Indexes       []IndexStat       `json:"indexes"`
 	Settings      map[string]string `json:"settings"`
 	Capabilities  map[string]bool   `json:"capabilities"`
+	Replication   ReplicationStats  `json:"replication"`
+	WAL           WALStats          `json:"wal"`
+}
+
+type ReplicationStats struct {
+	InRecovery bool                 `json:"inRecovery"`
+	Standbys   []ReplicationStandby `json:"standbys"`
+	Receiver   *WALReceiver         `json:"receiver,omitempty"`
+	Slots      []ReplicationSlot    `json:"slots"`
+}
+type ReplicationStandby struct {
+	Application, ClientAddress, State, SyncState       string
+	WriteLagSeconds, FlushLagSeconds, ReplayLagSeconds float64
+}
+type WALReceiver struct {
+	Status, SenderHost, LatestEndLSN string
+	LastMessageSeconds               float64
+}
+type ReplicationSlot struct {
+	Name, Type, Database, WALStatus string
+	Active                          bool
+	RetainedBytes                   float64
+}
+type WALStats struct {
+	TimedCheckpoints, RequestedCheckpoints, WriteTimeMS, SyncTimeMS, BuffersWritten float64
+	StatsReset                                                                      *time.Time
 }
 type ConnectionStats struct {
 	Active, Idle, IdleInTransaction, Waiting, Total, Max                  int

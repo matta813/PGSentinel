@@ -37,7 +37,9 @@ func main() {
 	defer store.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	notificationPolicy := notifications.NewTargetPolicy(cfg.AllowPrivateNotificationTargets, cfg.NotificationAllowedHosts)
 	manager := collector.NewManager(store, log, collector.Schedule{Fast: cfg.FastInterval, Standard: cfg.StatsInterval, Slow: cfg.SlowInterval, Metadata: cfg.MetaInterval, Retention: cfg.Retention, FanoutLimit: cfg.FanoutDatabaseLimit})
+	manager.SetNotificationDispatcher(notifications.NewDispatcher(store, notificationPolicy, log))
 	go manager.Run(ctx)
 	authentication, err := auth.New(auth.Config{Store: store, Username: "admin", Password: cfg.BootstrapAdminPassword, SecureCookies: cfg.SecureCookies, TrustedProxies: cfg.TrustedProxyCIDRs})
 	if err != nil {
@@ -46,7 +48,7 @@ func main() {
 	}
 	app := api.New(store, log, api.Options{
 		Auth:               authentication,
-		NotificationPolicy: notifications.NewTargetPolicy(cfg.AllowPrivateNotificationTargets, cfg.NotificationAllowedHosts),
+		NotificationPolicy: notificationPolicy,
 	})
 	app.ServeFrontend(cfg.FrontendDir)
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
