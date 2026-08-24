@@ -3,17 +3,35 @@ set -eu
 
 ci=.github/workflows/ci.yml
 release=.github/workflows/release.yml
+announcement=.github/workflows/release-announcement.yml
+growth=.github/workflows/weekly-growth-report.yml
 dependabot=.github/dependabot.yml
 osv_config=osv-scanner.toml
 
 test -f "$ci"
 test -f "$release"
+test -f "$announcement"
+test -f "$growth"
 test -f "$dependabot"
 test -f "$osv_config"
 grep -Fq 'paths: [RELEASE]' "$release"
 grep -Fq 'packages: write' "$release"
 grep -Fq 'docker/build-push-action@' "$release"
 grep -Fq 'provenance: mode=max' "$release"
+grep -Fq 'workflows: [Release]' "$announcement"
+grep -Fq 'contents: read' "$announcement"
+grep -Fq 'cron: "17 8 * * 1"' "$growth"
+grep -Fq 'actions: read' "$growth"
+grep -Fq 'issues: read' "$growth"
+grep -Fq 'pull-requests: read' "$growth"
+if grep -Eq ':[[:space:]]*write([[:space:]]|$)' "$announcement" "$growth"; then
+  echo "growth preparation workflows must remain read-only" >&2
+  exit 1
+fi
+if grep -Eiq 'release create|discussion create|issue create|git push|pull request merge|auto.?merge|reddit|hacker news|linkedin|mastodon|bluesky|discord' "$announcement" "$growth"; then
+  echo "growth preparation workflows must not publish, merge, or post externally" >&2
+  exit 1
+fi
 if grep -Eq 'docker/(build-push|login)-action|docker build|docker push' "$ci"; then
   echo "normal CI must not build or push a container" >&2
   exit 1

@@ -6,6 +6,7 @@
 - [Monitoring user](monitoring-user.md): PostgreSQL roles, TLS, and `pg_stat_statements`
 - [Health rules](health-rules.md): evidence, thresholds, confidence, and health scoring
 - [Releases](releases.md): release trains, versioning, images, notes, contributors, and automated publication
+- [Organic growth](growth.md): GitHub-native reports, human-reviewed release drafts, and maintainer guidance
 
 ## Contributors
 
@@ -14,5 +15,10 @@
 - [Contributing](../CONTRIBUTING.md): workflow and engineering expectations
 - [Roadmap](../ROADMAP.md): current priorities and project direction
 - [Security policy](../SECURITY.md): supported versions and private reporting
+
+## Maintainers
+
+- [Product assets](assets/README.md): reproducible synthetic screenshots and social preview
+- [GitHub discoverability](github-growth.md): owner-applied topics, homepage, preview, and community settings
 
 Documentation should describe current behavior. Planned features are explicitly identified as roadmap items and must not be presented as working functionality.

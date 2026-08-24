@@ -1,0 +1,71 @@
+name: Prepare release announcement
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing PGSentinel release tag (for example v0.6.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  draft:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+      - id: release
+        name: Read published release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_run ]; then
+            version=$(tr -d '\n' < RELEASE)
+            tag="v$version"
+          else
+            tag="$REQUESTED_TAG"
+            version=${tag#v}
+          fi
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "tag must be a v-prefixed PGSentinel release" >&2; exit 1 ;;
+          esac
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release-notes.md
+          title=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json name --jq .name)
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag"
+            echo 'title<<PGSENTINEL_RELEASE_TITLE'
+            echo "$title"
+            echo PGSENTINEL_RELEASE_TITLE
+          } >> "$GITHUB_OUTPUT"
+      - name: Generate announcement drafts
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TITLE: ${{ steps.release.outputs.title }}
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+        run: |
+          python3 scripts/generate-release-announcement.py \
+            --version "$VERSION" \
+            --title "$TITLE" \
+            --notes release-notes.md \
+            --release-url "$RELEASE_URL" \
+            --output release-announcement.md
+          cat release-announcement.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-announcement-${{ steps.release.outputs.version }}
+          path: release-announcement.md
+          if-no-files-found: error
+          retention-days: 30
