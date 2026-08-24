@@ -2,6 +2,8 @@ package collector
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"log/slog"
 	"sort"
 	"sync"
@@ -115,6 +117,7 @@ func (m *Manager) collectAll(ctx context.Context, cycle collectionCycle) {
 }
 
 func (m *Manager) collect(ctx context.Context, server models.Server, cycle collectionCycle) {
+	complete := true
 	target, err := m.store.GetServer(ctx, server.ID, true)
 	if err != nil {
 		return
@@ -148,27 +151,48 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		if queryErr == nil {
 			snapshot.Queries = queries
 			_ = m.store.SaveSnapshot(ctx, server.ID, "queries", queries, snapshot.CollectedAt)
+		} else {
+			m.log.Warn("collect queries", "server_id", server.ID, "error", queryErr)
+			complete = m.restoreSnapshot(ctx, server.ID, "queries", &snapshot.Queries) && complete
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "queries", &snapshot.Queries)
 	}
 	if cycle&cycleFast != 0 {
-		snapshot.Locks, _ = collector.CollectLocks(ctx)
-		_ = m.store.SaveSnapshot(ctx, server.ID, "locks", snapshot.Locks, snapshot.CollectedAt)
+		locks, lockErr := collector.CollectLocks(ctx)
+		if lockErr == nil {
+			snapshot.Locks = locks
+			_ = m.store.SaveSnapshot(ctx, server.ID, "locks", snapshot.Locks, snapshot.CollectedAt)
+		} else {
+			m.log.Warn("collect locks", "server_id", server.ID, "error", lockErr)
+			complete = m.restoreSnapshot(ctx, server.ID, "locks", &snapshot.Locks) && complete
+		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
 	}
 	if cycle&cycleSlow != 0 {
-		snapshot.Tables, snapshot.Indexes = m.collectPerDatabase(ctx, target, snapshot.Databases, snapshot.CollectedAt)
-		_ = m.store.SaveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt)
-		_ = m.store.SaveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt)
+		tables, indexes, collectionComplete := m.collectPerDatabase(ctx, target, snapshot.Databases)
+		if collectionComplete {
+			snapshot.Tables, snapshot.Indexes = tables, indexes
+			_ = m.store.SaveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt)
+			_ = m.store.SaveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt)
+		} else {
+			complete = m.restoreSnapshot(ctx, server.ID, "tables", &snapshot.Tables) && complete
+			complete = m.restoreSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes) && complete
+		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
 		_ = m.store.LatestSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes)
 	}
 	if cycle&cycleMetadata != 0 {
-		snapshot.Settings, _ = collector.CollectConfiguration(ctx)
-		_ = m.store.SaveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt)
+		settings, settingsErr := collector.CollectConfiguration(ctx)
+		if settingsErr == nil {
+			snapshot.Settings = settings
+			_ = m.store.SaveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt)
+		} else {
+			m.log.Warn("collect configuration", "server_id", server.ID, "error", settingsErr)
+			complete = m.restoreSnapshot(ctx, server.ID, "configuration", &snapshot.Settings) && complete
+		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
 	}
@@ -182,7 +206,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	}
 	findings := m.engine.Analyze(snapshot)
 	findings = append(findings, analyzer.IndexFindings(server.ID, snapshot.Indexes)...)
-	_ = m.store.UpsertFindings(ctx, server.ID, findings)
+	if err := m.reconcileFindings(ctx, server.ID, findings, complete); err != nil {
+		m.log.Warn("reconcile findings", "server_id", server.ID, "error", err)
+	}
 	_ = m.store.UpdateServerStatus(ctx, server.ID, "healthy", snapshot.Version, "", true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
 }
@@ -202,7 +228,8 @@ func collectibleDatabases(stats []models.DatabaseStat, limit int) []models.Datab
 	return out
 }
 
-func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, dbStats []models.DatabaseStat, at time.Time) (tables []models.TableStat, indexes []models.IndexStat) {
+func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, dbStats []models.DatabaseStat) (tables []models.TableStat, indexes []models.IndexStat, complete bool) {
+	complete = true
 	targets := collectibleDatabases(dbStats, m.schedule.FanoutLimit)
 	if len(targets) == 0 {
 		targets = []models.DatabaseStat{{Name: "postgres"}}
@@ -213,18 +240,21 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		}
 		client, err := pg.ConnectDatabase(ctx, server, db.Name)
 		if err != nil {
+			complete = false
 			m.log.Warn("per-database collection failed", "server_id", server.ID, "database", db.Name, "error", err)
 			continue
 		}
 		core := NewCore(client.Pool())
 		dbTables, err := core.CollectTables(ctx, db.Name)
 		if err != nil {
+			complete = false
 			m.log.Warn("collect tables", "server_id", server.ID, "database", db.Name, "error", err)
 		} else {
 			tables = append(tables, dbTables...)
 		}
 		dbIndexes, err := core.CollectIndexes(ctx)
 		if err != nil {
+			complete = false
 			m.log.Warn("collect indexes", "server_id", server.ID, "database", db.Name, "error", err)
 		} else {
 			indexes = append(indexes, dbIndexes...)
@@ -232,6 +262,22 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		client.Close()
 	}
 	return
+}
+
+func (m *Manager) reconcileFindings(ctx context.Context, serverID string, findings []models.Finding, complete bool) error {
+	if !complete {
+		return nil
+	}
+	return m.store.UpsertFindings(ctx, serverID, findings)
+}
+
+func (m *Manager) restoreSnapshot(ctx context.Context, serverID, kind string, value any) bool {
+	err := m.store.LatestSnapshot(ctx, serverID, kind, value)
+	if err == nil || errors.Is(err, sql.ErrNoRows) {
+		return true
+	}
+	m.log.Warn("restore last complete snapshot", "server_id", serverID, "kind", kind, "error", err)
+	return false
 }
 
 func restoreCapabilities(ctx context.Context, store *storage.Store, serverID string, snapshot *models.Snapshot) {
