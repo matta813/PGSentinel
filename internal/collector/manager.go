@@ -132,7 +132,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	if coreFresh {
 		snapshot, err = collector.Collect(ctx, server.ID)
 		if err != nil {
-			m.log.Warn("core collection failed", "server_id", server.ID, "error", err)
+			m.recordCollectionFailure(ctx, server, err)
 			return
 		}
 		if cycle&cycleStandard == 0 {
@@ -185,6 +185,13 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	_ = m.store.UpsertFindings(ctx, server.ID, findings)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, "healthy", snapshot.Version, "", true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func (m *Manager) recordCollectionFailure(ctx context.Context, server models.Server, collectionErr error) {
+	m.log.Warn("core collection failed", "server_id", server.ID, "error", collectionErr)
+	if err := m.store.UpdateServerStatus(ctx, server.ID, "error", server.Version, collectionErr.Error(), false); err != nil {
+		m.log.Warn("update server collection status", "server_id", server.ID, "error", err)
+	}
 }
 
 func collectibleDatabases(stats []models.DatabaseStat, limit int) []models.DatabaseStat {
