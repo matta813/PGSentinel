@@ -50,6 +50,10 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 	if v.Port == 0 {
 		v.Port = 5432
 	}
+	if v.Port < 1 || v.Port > 65535 {
+		failure(w, 422, "Port must be between 1 and 65535", nil)
+		return
+	}
 	if v.SSLMode == "" {
 		v.SSLMode = "prefer"
 	}
@@ -113,6 +117,10 @@ func (a *API) updateServer(w http.ResponseWriter, r *http.Request) {
 	}
 	if v.Port == 0 {
 		v.Port = 5432
+	}
+	if v.Port < 1 || v.Port > 65535 {
+		failure(w, 422, "Port must be between 1 and 65535", nil)
+		return
 	}
 	if v.SSLMode == "" {
 		v.SSLMode = "prefer"

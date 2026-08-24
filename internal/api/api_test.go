@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/matta813/pgsentinel/internal/auth"
 	"github.com/matta813/pgsentinel/internal/storage"
 	"io"
@@ -168,6 +169,35 @@ func TestServerTagsAreNormalizedAndFilterable(t *testing.T) {
 	}
 	if strings.Count(r.Body.String(), "Production") != 1 || !strings.Contains(r.Body.String(), `"tags":["EU","Production"]`) {
 		t.Fatalf("tags were not normalized: %s", r.Body.String())
+	}
+}
+
+func TestServerPortValidation(t *testing.T) {
+	h := testAPI(t)
+	for _, port := range []int{-1, 65536} {
+		body := fmt.Sprintf(`{"name":"invalid-%d","host":"localhost","port":%d,"user":"monitor","password":"secret"}`, port, port)
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(body)))
+		if r.Code != http.StatusUnprocessableEntity || !strings.Contains(r.Body.String(), "Port must be between 1 and 65535") {
+			t.Fatalf("create with port %d returned %d: %s", port, r.Code, r.Body.String())
+		}
+	}
+
+	body := `{"name":"valid","host":"localhost","user":"monitor","password":"secret"}`
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(body)))
+	if r.Code != http.StatusCreated {
+		t.Fatalf("create valid server=%d %s", r.Code, r.Body.String())
+	}
+	var server map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&server); err != nil {
+		t.Fatal(err)
+	}
+	update := `{"name":"valid","host":"localhost","port":70000,"user":"monitor"}`
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPut, "/api/v1/servers/"+server["id"].(string), strings.NewReader(update)))
+	if r.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("update with invalid port returned %d: %s", r.Code, r.Body.String())
 	}
 }
 
