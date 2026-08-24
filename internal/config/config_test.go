@@ -57,3 +57,17 @@ func TestLoadRequiresStrongAdminPassword(t *testing.T) {
 		t.Fatal("expected short admin password error")
 	}
 }
+
+func TestLoadRejectsInvalidBooleanConfiguration(t *testing.T) {
+	for _, key := range []string{"PGSENTINEL_SECURE_COOKIES", "PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS"} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
+			t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "test-encryption-key-32-chars-min")
+			t.Setenv("PGSENTINEL_ADMIN_PASSWORD", "a-secure-test-password")
+			t.Setenv(key, "treu")
+			if _, err := Load(); err == nil {
+				t.Fatalf("invalid %s value was silently accepted", key)
+			}
+		})
+	}
+}

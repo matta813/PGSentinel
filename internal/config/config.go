@@ -31,11 +31,19 @@ type Config struct {
 
 func Load() (Config, error) {
 	dataDir := env("PGSENTINEL_DATA_DIR", "/data")
+	secureCookies, err := boolean("PGSENTINEL_SECURE_COOKIES", false)
+	if err != nil {
+		return Config{}, err
+	}
+	allowPrivateTargets, err := boolean("PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS", false)
+	if err != nil {
+		return Config{}, err
+	}
 	c := Config{
 		ListenAddr: env("PGSENTINEL_LISTEN_ADDR", ":8080"), DataDir: dataDir,
 		DatabasePath:  filepath.Join(dataDir, "pgsentinel.db"),
 		EncryptionKey: os.Getenv("PGSENTINEL_ENCRYPTION_KEY"), BootstrapAdminPassword: os.Getenv("PGSENTINEL_ADMIN_PASSWORD"), LogLevel: env("PGSENTINEL_LOG_LEVEL", "info"),
-		SecureCookies: boolean("PGSENTINEL_SECURE_COOKIES", false), AllowPrivateNotificationTargets: boolean("PGSENTINEL_ALLOW_PRIVATE_NOTIFICATION_TARGETS", false),
+		SecureCookies: secureCookies, AllowPrivateNotificationTargets: allowPrivateTargets,
 		NotificationAllowedHosts: list("PGSENTINEL_NOTIFICATION_ALLOWED_HOSTS"),
 		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
 		FastInterval:             duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
@@ -59,13 +67,16 @@ func Load() (Config, error) {
 	return c, nil
 }
 
-func boolean(key string, fallback bool) bool {
+func boolean(key string, fallback bool) (bool, error) {
 	v := os.Getenv(key)
 	if v == "" {
-		return fallback
+		return fallback, nil
 	}
 	parsed, err := strconv.ParseBool(v)
-	return err == nil && parsed
+	if err != nil {
+		return false, fmt.Errorf("%s must be a valid boolean: %w", key, err)
+	}
+	return parsed, nil
 }
 
 func list(key string) []string {
