@@ -11,6 +11,7 @@ import (
 
 	"github.com/matta813/pgsentinel/internal/analyzer"
 	"github.com/matta813/pgsentinel/internal/models"
+	"github.com/matta813/pgsentinel/internal/notifications"
 	pg "github.com/matta813/pgsentinel/internal/postgres"
 	"github.com/matta813/pgsentinel/internal/storage"
 )
@@ -31,11 +32,16 @@ const (
 )
 
 type Manager struct {
-	store    *storage.Store
-	engine   *analyzer.Engine
-	log      *slog.Logger
-	schedule Schedule
-	wg       sync.WaitGroup
+	store      *storage.Store
+	engine     *analyzer.Engine
+	log        *slog.Logger
+	schedule   Schedule
+	wg         sync.WaitGroup
+	dispatcher *notifications.Dispatcher
+}
+
+func (m *Manager) SetNotificationDispatcher(dispatcher *notifications.Dispatcher) {
+	m.dispatcher = dispatcher
 }
 
 func NewManager(store *storage.Store, log *slog.Logger, schedule Schedule) *Manager {
@@ -118,6 +124,7 @@ func (m *Manager) collectAll(ctx context.Context, cycle collectionCycle) {
 
 func (m *Manager) collect(ctx context.Context, server models.Server, cycle collectionCycle) {
 	complete := true
+	var regressionFindings []models.Finding
 	target, err := m.store.GetServer(ctx, server.ID, true)
 	if err != nil {
 		return
@@ -146,16 +153,41 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		return
 	}
 	if cycle&cycleStandard != 0 {
+		replication, replicationErr := collector.CollectReplication(ctx)
+		if replicationErr == nil {
+			snapshot.Replication = replication
+			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", replication, snapshot.CollectedAt)
+		} else {
+			m.log.Warn("collect replication", "server_id", server.ID, "error", replicationErr)
+			_ = m.restoreSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
+			complete = false
+		}
+		wal, walErr := collector.CollectWAL(ctx)
+		if walErr == nil {
+			snapshot.WAL = wal
+			_ = m.store.SaveSnapshot(ctx, server.ID, "wal", wal, snapshot.CollectedAt)
+		} else {
+			m.log.Warn("collect WAL statistics", "server_id", server.ID, "error", walErr)
+			_ = m.restoreSnapshot(ctx, server.ID, "wal", &snapshot.WAL)
+			complete = false
+		}
 		queries, available, queryErr := collector.CollectQueries(ctx)
 		snapshot.Capabilities["pg_stat_statements"] = available
 		if queryErr == nil {
+			history, historyErr := m.store.RecentQuerySnapshots(ctx, server.ID, 7)
+			if historyErr == nil {
+				regressionFindings = analyzer.QueryRegressionFindings(server.ID, history, queries)
+			}
 			snapshot.Queries = queries
 			_ = m.store.SaveSnapshot(ctx, server.ID, "queries", queries, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect queries", "server_id", server.ID, "error", queryErr)
-			complete = m.restoreSnapshot(ctx, server.ID, "queries", &snapshot.Queries) && complete
+			_ = m.restoreSnapshot(ctx, server.ID, "queries", &snapshot.Queries)
+			complete = false
 		}
 	} else {
+		_ = m.store.LatestSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
+		_ = m.store.LatestSnapshot(ctx, server.ID, "wal", &snapshot.WAL)
 		_ = m.store.LatestSnapshot(ctx, server.ID, "queries", &snapshot.Queries)
 	}
 	if cycle&cycleFast != 0 {
@@ -165,7 +197,8 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			_ = m.store.SaveSnapshot(ctx, server.ID, "locks", snapshot.Locks, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect locks", "server_id", server.ID, "error", lockErr)
-			complete = m.restoreSnapshot(ctx, server.ID, "locks", &snapshot.Locks) && complete
+			_ = m.restoreSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
+			complete = false
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
@@ -177,8 +210,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			_ = m.store.SaveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt)
 			_ = m.store.SaveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt)
 		} else {
-			complete = m.restoreSnapshot(ctx, server.ID, "tables", &snapshot.Tables) && complete
-			complete = m.restoreSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes) && complete
+			_ = m.restoreSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
+			_ = m.restoreSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes)
+			complete = false
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
@@ -191,7 +225,8 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			_ = m.store.SaveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect configuration", "server_id", server.ID, "error", settingsErr)
-			complete = m.restoreSnapshot(ctx, server.ID, "configuration", &snapshot.Settings) && complete
+			_ = m.restoreSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
+			complete = false
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
@@ -205,12 +240,24 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		return
 	}
 	findings := m.engine.Analyze(snapshot)
+	findings = append(findings, regressionFindings...)
 	findings = append(findings, analyzer.IndexFindings(server.ID, snapshot.Indexes)...)
 	if err := m.reconcileFindings(ctx, server.ID, findings, complete); err != nil {
 		m.log.Warn("reconcile findings", "server_id", server.ID, "error", err)
 	}
-	_ = m.store.UpdateServerStatus(ctx, server.ID, "healthy", snapshot.Version, "", true)
+	if m.dispatcher != nil {
+		m.dispatcher.DispatchPending(ctx)
+	}
+	status, lastError := collectionOutcome(complete)
+	_ = m.store.UpdateServerStatus(ctx, server.ID, status, snapshot.Version, lastError, true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func collectionOutcome(complete bool) (string, string) {
+	if complete {
+		return "healthy", ""
+	}
+	return "degraded", "One or more collector sections failed; cached evidence is being preserved."
 }
 
 func (m *Manager) recordCollectionFailure(ctx context.Context, server models.Server, collectionErr error) {
@@ -280,8 +327,12 @@ func (m *Manager) reconcileFindings(ctx context.Context, serverID string, findin
 
 func (m *Manager) restoreSnapshot(ctx context.Context, serverID, kind string, value any) bool {
 	err := m.store.LatestSnapshot(ctx, serverID, kind, value)
-	if err == nil || errors.Is(err, sql.ErrNoRows) {
+	if err == nil {
 		return true
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		m.log.Warn("collector section unavailable and has no cached snapshot", "server_id", serverID, "kind", kind)
+		return false
 	}
 	m.log.Warn("restore last complete snapshot", "server_id", serverID, "kind", kind, "error", err)
 	return false

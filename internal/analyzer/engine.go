@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
-type Thresholds struct{ ConnectionHigh, ConnectionCritical, IdleTransactionSeconds, LongTransactionSeconds, LongQuerySeconds, DeadTupleRatio, VacuumProgress, CacheHitLow, RollbackRatio, QueryImpactHigh float64 }
+type Thresholds struct{ ConnectionHigh, ConnectionCritical, IdleTransactionSeconds, LongTransactionSeconds, LongQuerySeconds, DeadTupleRatio, VacuumProgress, CacheHitLow, RollbackRatio, QueryImpactHigh, ReplicaLagSeconds, SlotRetainedBytes, RequestedCheckpointRatio, CheckpointIntervalSeconds float64 }
 
-func DefaultThresholds() Thresholds { return Thresholds{80, 95, 300, 900, 60, 20, 100, 95, 5, 250} }
+func DefaultThresholds() Thresholds {
+	return Thresholds{80, 95, 300, 900, 60, 20, 100, 95, 5, 250, 60, 1024 * 1024 * 1024, 20, 300}
+}
 
 type Engine struct{ Thresholds Thresholds }
 
@@ -17,6 +19,42 @@ func (e *Engine) Analyze(s models.Snapshot) []models.Finding {
 	t := e.Thresholds
 	out := []models.Finding{}
 	add := func(f models.Finding) { out = append(out, f) }
+	if s.Replication.InRecovery {
+		if s.Replication.Receiver == nil {
+			add(newFinding("wal-receiver-disconnected", s.ServerID, "", "", models.SeverityHigh, "Replication", "Replica is not receiving WAL", "PostgreSQL reports recovery mode but no WAL receiver process is visible.", "The replica may stop replaying new changes and fall behind its upstream.", models.ConfidenceHigh, []models.Evidence{{Label: "Server role", Value: "replica"}, {Label: "WAL receiver", Value: "not running"}}))
+		} else if s.Replication.Receiver.Status != "streaming" {
+			add(newFinding("wal-receiver-state", s.ServerID, "", "", models.SeverityHigh, "Replication", "Replica WAL receiver is not streaming", fmt.Sprintf("The WAL receiver state is %s.", s.Replication.Receiver.Status), "Replication progress may be interrupted until streaming resumes.", models.ConfidenceHigh, []models.Evidence{{Label: "Receiver state", Value: s.Replication.Receiver.Status}, {Label: "Last message age", Value: fmt.Sprintf("%.0f seconds", s.Replication.Receiver.LastMessageSeconds)}}))
+		}
+	}
+	for _, standby := range s.Replication.Standbys {
+		resource := standby.Application
+		if resource == "" {
+			resource = standby.ClientAddress
+		}
+		if standby.State != "streaming" {
+			add(newFinding("standby-state", s.ServerID, "", resource, models.SeverityHigh, "Replication", "Connected standby is not streaming", fmt.Sprintf("Standby %s reports replication state %s.", resource, standby.State), "The standby may not be receiving current WAL from this primary.", models.ConfidenceHigh, []models.Evidence{{Label: "State", Value: standby.State}, {Label: "Sync mode", Value: standby.SyncState}}))
+		} else if standby.ReplayLagSeconds >= t.ReplicaLagSeconds {
+			add(newFinding("standby-replay-lag", s.ServerID, "", resource, models.SeverityMedium, "Replication", "Replica replay lag is elevated", fmt.Sprintf("Standby %s reports %.1f seconds of replay lag.", resource, standby.ReplayLagSeconds), "Reads from the replica may observe older data and recovery objectives may be at risk if lag continues.", models.ConfidenceMedium, []models.Evidence{{Label: "Replay lag", Value: fmt.Sprintf("%.1f seconds", standby.ReplayLagSeconds)}, {Label: "Flush lag", Value: fmt.Sprintf("%.1f seconds", standby.FlushLagSeconds)}, {Label: "Sync mode", Value: standby.SyncState}}))
+		}
+	}
+	for _, slot := range s.Replication.Slots {
+		if !slot.Active && slot.RetainedBytes >= t.SlotRetainedBytes {
+			add(newFinding("inactive-slot-wal", s.ServerID, slot.Database, slot.Name, models.SeverityHigh, "Replication", "Inactive replication slot is retaining WAL", fmt.Sprintf("Slot %s is inactive and retains approximately %.0f bytes of WAL.", slot.Name, slot.RetainedBytes), "Retained WAL can continue consuming disk until the slot advances or is deliberately removed.", models.ConfidenceHigh, []models.Evidence{{Label: "Slot", Value: slot.Name}, {Label: "Retained WAL", Value: fmt.Sprintf("%.0f bytes", slot.RetainedBytes)}, {Label: "WAL status", Value: slot.WALStatus}}))
+		}
+	}
+	checkpointTotal := s.WAL.TimedCheckpoints + s.WAL.RequestedCheckpoints
+	if checkpointTotal >= 10 {
+		requestedRatio := s.WAL.RequestedCheckpoints / checkpointTotal * 100
+		if requestedRatio >= t.RequestedCheckpointRatio {
+			add(newFinding("requested-checkpoints", s.ServerID, "", "", models.SeverityMedium, "WAL", "Requested checkpoints are frequent", fmt.Sprintf("%.1f%% of %.0f checkpoints were requested rather than timed.", requestedRatio, checkpointTotal), "Frequent requested checkpoints can increase write bursts and indicate WAL pressure or undersized max_wal_size.", models.ConfidenceMedium, []models.Evidence{{Label: "Requested", Value: fmt.Sprintf("%.0f", s.WAL.RequestedCheckpoints)}, {Label: "Timed", Value: fmt.Sprintf("%.0f", s.WAL.TimedCheckpoints)}, {Label: "Requested ratio", Value: fmt.Sprintf("%.1f%%", requestedRatio)}}))
+		}
+		if s.WAL.StatsReset != nil {
+			interval := time.Since(*s.WAL.StatsReset).Seconds() / checkpointTotal
+			if interval > 0 && interval < t.CheckpointIntervalSeconds {
+				add(newFinding("checkpoint-frequency", s.ServerID, "", "", models.SeverityMedium, "WAL", "Checkpoints are occurring frequently", fmt.Sprintf("The average interval since the statistics reset is %.0f seconds.", interval), "Frequent checkpoints can create avoidable write pressure and latency variability.", models.ConfidenceMedium, []models.Evidence{{Label: "Average interval", Value: fmt.Sprintf("%.0f seconds", interval)}, {Label: "Write time", Value: fmt.Sprintf("%.0f ms", s.WAL.WriteTimeMS)}, {Label: "Sync time", Value: fmt.Sprintf("%.0f ms", s.WAL.SyncTimeMS)}}))
+			}
+		}
+	}
 	if s.Connections.Utilization >= t.ConnectionHigh {
 		sev := models.SeverityHigh
 		if s.Connections.Utilization >= t.ConnectionCritical {

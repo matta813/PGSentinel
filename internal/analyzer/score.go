@@ -9,7 +9,7 @@ type Score struct {
 
 func HealthScore(findings []models.Finding) Score {
 	weights := map[models.Severity]int{models.SeverityInfo: 0, models.SeverityLow: 2, models.SeverityMedium: 6, models.SeverityHigh: 15, models.SeverityCritical: 35}
-	cats := map[string]int{"Performance": 100, "Vacuum": 100, "Queries": 100, "Connections": 100, "Indexes": 100, "Configuration": 100, "Replication": 100}
+	cats := map[string]int{"Performance": 100, "Vacuum": 100, "Queries": 100, "Connections": 100, "Indexes": 100, "Configuration": 100, "Replication": 100, "WAL": 100}
 	total := 0
 	for _, f := range findings {
 		if f.Status != "active" && f.Status != "acknowledged" {
