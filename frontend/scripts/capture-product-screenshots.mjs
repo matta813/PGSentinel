@@ -67,7 +67,7 @@ try {
     const pathname = new URL(route.request().url()).pathname
     const bodies = {
       '/api/v1/auth/session': { authenticated: true, username: 'admin', mustChangePassword: false },
-      '/api/v1/version': { version: '0.5.0', commit: 'demo' },
+      '/api/v1/version': { version: '0.6.0', commit: 'demo' },
       '/api/v1/overview': { servers: [server, degradedServer], problems: findings, counts: { CRITICAL: 1, HIGH: 1, MEDIUM: 1 }, score: { overall: 68, categories: { connections: 61, transactions: 44, queries: 87, vacuum: 72, indexes: 93 } } },
       '/api/v1/problems': findings,
     }
