@@ -107,6 +107,12 @@ func TestPasswordChangeClearsFirstLoginRequirement(t *testing.T) {
 	}
 	request := httptest.NewRequest(http.MethodPut, "/api/v1/auth/password", nil)
 	request.AddCookie(response.Result().Cookies()[0])
+	otherResponse := httptest.NewRecorder()
+	if err := manager.Start(otherResponse, user); err != nil {
+		t.Fatal(err)
+	}
+	otherRequest := httptest.NewRequest(http.MethodGet, "/api/v1/servers", nil)
+	otherRequest.AddCookie(otherResponse.Result().Cookies()[0])
 	if err := manager.ChangePassword(context.Background(), request, "wrong-password", "a secure replacement password"); err != ErrInvalidCredentials {
 		t.Fatalf("wrong current password error=%v", err)
 	}
@@ -128,6 +134,9 @@ func TestPasswordChangeClearsFirstLoginRequirement(t *testing.T) {
 	}
 	if session, valid := manager.Session(request); !valid || session.MustChangePassword {
 		t.Fatalf("active session was not updated: %#v valid=%v", session, valid)
+	}
+	if manager.Valid(otherRequest) {
+		t.Fatal("password change did not revoke another active session")
 	}
 }
 

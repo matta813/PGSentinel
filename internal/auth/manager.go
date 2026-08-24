@@ -222,12 +222,22 @@ func (m *Manager) ChangePassword(ctx context.Context, r *http.Request, currentPa
 	if err := m.store.UpdateUserPassword(ctx, user.ID, derivePassword(newPassword, salt), salt); err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
+	cookie, err := r.Cookie(CookieName)
+	if err != nil || cookie.Value == "" {
+		return ErrInvalidCredentials
+	}
+	currentToken := sha256.Sum256([]byte(cookie.Value))
 	m.mu.Lock()
 	for token, active := range m.sessions {
-		if active.UserID == user.ID {
-			active.MustChangePassword = false
-			m.sessions[token] = active
+		if active.UserID != user.ID {
+			continue
 		}
+		if token != currentToken {
+			delete(m.sessions, token)
+			continue
+		}
+		active.MustChangePassword = false
+		m.sessions[token] = active
 	}
 	m.mu.Unlock()
 	return nil
