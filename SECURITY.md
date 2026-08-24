@@ -4,7 +4,7 @@
 
 | Version | Security updates |
 |---|---|
-| Latest `0.2.x` release | Supported |
+| Latest `0.5.x` release | Supported |
 | `main` | Development only |
 | Older releases | Not supported |
 
