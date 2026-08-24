@@ -6,6 +6,6 @@ export function HealthScore({ value }: { value: number }) {
     <div className="health-score-heading"><span>Overall health</span></div>
     <div className="health-score-value"><strong>{value}</strong><span className="health-label"><i />{label}</span></div>
     <div className="health-track" aria-hidden="true"><i style={{ width: `${clamped}%` }} /></div>
-    <p>Based on active findings across the monitored estate.</p>
+    <p>Based on active findings and collection availability across the monitored estate.</p>
   </article>
 }

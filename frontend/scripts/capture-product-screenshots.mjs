@@ -15,6 +15,11 @@ const server = {
   user: 'pgsentinel', sslMode: 'verify-full', version: '16.4', status: 'healthy',
   lastConnectedAt: now, tags: ['production', 'primary'],
 }
+const degradedServer = {
+  id: 'analytics-replica', name: 'Analytics replica', host: 'postgres-analytics.internal', port: 5432,
+  user: 'pgsentinel', sslMode: 'verify-full', version: '16.4', status: 'degraded',
+  lastConnectedAt: now, lastError: 'WAL statistics collection failed; cached evidence is being preserved.', tags: ['production', 'replica'],
+}
 const findings = [
   {
     id: 'long-transaction', serverId: server.id, database: 'payments', resource: 'PID 18422', severity: 'CRITICAL',
@@ -63,7 +68,7 @@ try {
     const bodies = {
       '/api/v1/auth/session': { authenticated: true, username: 'admin', mustChangePassword: false },
       '/api/v1/version': { version: '0.5.0', commit: 'demo' },
-      '/api/v1/overview': { servers: [server], problems: findings, counts: { CRITICAL: 1, HIGH: 1, MEDIUM: 1 }, score: { overall: 68, categories: { connections: 61, transactions: 44, queries: 87, vacuum: 72, indexes: 93 } } },
+      '/api/v1/overview': { servers: [server, degradedServer], problems: findings, counts: { CRITICAL: 1, HIGH: 1, MEDIUM: 1 }, score: { overall: 68, categories: { connections: 61, transactions: 44, queries: 87, vacuum: 72, indexes: 93 } } },
       '/api/v1/problems': findings,
     }
     const body = bodies[pathname]
