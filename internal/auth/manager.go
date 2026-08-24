@@ -65,6 +65,7 @@ type Manager struct {
 	maxClients     int
 	trustedProxies []netip.Prefix
 	passwordSlots  chan struct{}
+	passwordMu     sync.Mutex
 
 	mu       sync.Mutex
 	sessions map[[sha256.Size]byte]Session
@@ -204,6 +205,8 @@ func (m *Manager) ChangePassword(ctx context.Context, r *http.Request, currentPa
 	if len(newPassword) < MinimumPasswordLength {
 		return ErrWeakPassword
 	}
+	m.passwordMu.Lock()
+	defer m.passwordMu.Unlock()
 	session, ok := m.Session(r)
 	if !ok {
 		return ErrInvalidCredentials
