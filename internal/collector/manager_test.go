@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"path/filepath"
@@ -118,5 +119,67 @@ func TestRestoreCapabilitiesPreservesKnownStateOnFastCycles(t *testing.T) {
 	restoreCapabilities(ctx, store, serverID, &snapshot)
 	if !snapshot.Capabilities["pg_stat_statements"] {
 		t.Fatal("expected pg_stat_statements capability to be preserved on a fast cycle")
+	}
+}
+
+func TestIncompleteCollectionDoesNotResolveExistingFindings(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long-enough-encryption-key-32-chars")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	server := models.Server{ID: "server", Name: "server", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
+	if err := store.CreateServer(ctx, &server); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	finding := models.Finding{ID: "finding", RuleID: "query-impact", Fingerprint: "fingerprint", ServerID: server.ID, Severity: models.SeverityMedium, Category: "Queries", Title: "High impact", Status: "active", StartedAt: now, UpdatedAt: now}
+	if err := store.UpsertFindings(ctx, server.ID, []models.Finding{finding}); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := NewManager(store, slog.New(slog.NewTextHandler(io.Discard, nil)), Schedule{})
+	if err := manager.reconcileFindings(ctx, server.ID, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	active, err := store.ListFindings(ctx, "active", server.ID)
+	if err != nil || len(active) != 1 {
+		t.Fatalf("incomplete collection changed active findings: %#v, err=%v", active, err)
+	}
+
+	if err := manager.reconcileFindings(ctx, server.ID, nil, true); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := store.ListFindings(ctx, "resolved", server.ID)
+	if err != nil || len(resolved) != 1 {
+		t.Fatalf("complete collection did not reconcile findings: %#v, err=%v", resolved, err)
+	}
+}
+
+func TestCoreCollectionFailureReplacesStaleHealthyStatus(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "manager.db"), "long-enough-encryption-key-32-chars")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	server := models.Server{ID: "server", Name: "server", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable", Version: "16.4", Status: "healthy"}
+	if err := store.CreateServer(ctx, &server); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateServerStatus(ctx, server.ID, "healthy", server.Version, "", true); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := NewManager(store, slog.New(slog.NewTextHandler(io.Discard, nil)), Schedule{})
+	manager.recordCollectionFailure(ctx, server, errors.New("permission denied for pg_stat_activity"))
+
+	got, err := store.GetServer(ctx, server.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "error" || got.LastError != "permission denied for pg_stat_activity" {
+		t.Fatalf("server status=%q error=%q, want collection error", got.Status, got.LastError)
 	}
 }
