@@ -65,6 +65,7 @@ type Manager struct {
 	maxClients     int
 	trustedProxies []netip.Prefix
 	passwordSlots  chan struct{}
+	passwordMu     sync.Mutex
 
 	mu       sync.Mutex
 	sessions map[[sha256.Size]byte]Session
@@ -204,10 +205,17 @@ func (m *Manager) ChangePassword(ctx context.Context, r *http.Request, currentPa
 	if len(newPassword) < MinimumPasswordLength {
 		return ErrWeakPassword
 	}
+	m.passwordMu.Lock()
+	defer m.passwordMu.Unlock()
 	session, ok := m.Session(r)
 	if !ok {
 		return ErrInvalidCredentials
 	}
+	cookie, err := r.Cookie(CookieName)
+	if err != nil || cookie.Value == "" {
+		return ErrInvalidCredentials
+	}
+	currentToken := sha256.Sum256([]byte(cookie.Value))
 	user, err := m.Authenticate(ctx, session.Username, currentPassword)
 	if err != nil {
 		return ErrInvalidCredentials
@@ -224,10 +232,15 @@ func (m *Manager) ChangePassword(ctx context.Context, r *http.Request, currentPa
 	}
 	m.mu.Lock()
 	for token, active := range m.sessions {
-		if active.UserID == user.ID {
-			active.MustChangePassword = false
-			m.sessions[token] = active
+		if active.UserID != user.ID {
+			continue
 		}
+		if token != currentToken {
+			delete(m.sessions, token)
+			continue
+		}
+		active.MustChangePassword = false
+		m.sessions[token] = active
 	}
 	m.mu.Unlock()
 	return nil

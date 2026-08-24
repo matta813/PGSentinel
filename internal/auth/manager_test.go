@@ -107,6 +107,12 @@ func TestPasswordChangeClearsFirstLoginRequirement(t *testing.T) {
 	}
 	request := httptest.NewRequest(http.MethodPut, "/api/v1/auth/password", nil)
 	request.AddCookie(response.Result().Cookies()[0])
+	otherResponse := httptest.NewRecorder()
+	if err := manager.Start(otherResponse, user); err != nil {
+		t.Fatal(err)
+	}
+	otherRequest := httptest.NewRequest(http.MethodGet, "/api/v1/servers", nil)
+	otherRequest.AddCookie(otherResponse.Result().Cookies()[0])
 	if err := manager.ChangePassword(context.Background(), request, "wrong-password", "a secure replacement password"); err != ErrInvalidCredentials {
 		t.Fatalf("wrong current password error=%v", err)
 	}
@@ -128,6 +134,58 @@ func TestPasswordChangeClearsFirstLoginRequirement(t *testing.T) {
 	}
 	if session, valid := manager.Session(request); !valid || session.MustChangePassword {
 		t.Fatalf("active session was not updated: %#v valid=%v", session, valid)
+	}
+	if manager.Valid(otherRequest) {
+		t.Fatal("password change did not revoke another active session")
+	}
+}
+
+func TestConcurrentPasswordChangesCannotBothSucceed(t *testing.T) {
+	manager, _ := newTestManager(t, nil)
+	user, err := manager.Authenticate(context.Background(), "admin", "correct horse battery staple")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := make([]*http.Request, 2)
+	for i := range requests {
+		response := httptest.NewRecorder()
+		if err := manager.Start(response, user); err != nil {
+			t.Fatal(err)
+		}
+		requests[i] = httptest.NewRequest(http.MethodPut, "/api/v1/auth/password", nil)
+		requests[i].AddCookie(response.Result().Cookies()[0])
+	}
+	passwords := []string{"first concurrent replacement", "second concurrent replacement"}
+	start := make(chan struct{})
+	results := make(chan error, len(requests))
+	for i := range requests {
+		go func(index int) {
+			<-start
+			results <- manager.ChangePassword(context.Background(), requests[index], "correct horse battery staple", passwords[index])
+		}(i)
+	}
+	close(start)
+
+	succeeded := 0
+	for range requests {
+		err := <-results
+		if err == nil {
+			succeeded++
+		} else if err != ErrInvalidCredentials {
+			t.Fatalf("unexpected concurrent change error: %v", err)
+		}
+	}
+	if succeeded != 1 {
+		t.Fatalf("%d concurrent password changes succeeded, want exactly one", succeeded)
+	}
+	validPasswords := 0
+	for _, password := range passwords {
+		if _, err := manager.Authenticate(context.Background(), "admin", password); err == nil {
+			validPasswords++
+		}
+	}
+	if validPasswords != 1 {
+		t.Fatalf("%d replacement passwords authenticate, want exactly one", validPasswords)
 	}
 }
 
