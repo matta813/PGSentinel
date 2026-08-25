@@ -79,6 +79,28 @@ type Finding struct {
 	SuppressionReason string       `json:"suppressionReason,omitempty"`
 	Maintenance       bool         `json:"maintenance"`
 }
+type Incident struct {
+	ID         string          `json:"id"`
+	ServerID   string          `json:"serverId"`
+	Title      string          `json:"title"`
+	Summary    string          `json:"summary"`
+	Rationale  []string        `json:"rationale"`
+	Severity   Severity        `json:"severity"`
+	Status     string          `json:"status"`
+	StartedAt  time.Time       `json:"startedAt"`
+	UpdatedAt  time.Time       `json:"updatedAt"`
+	ResolvedAt *time.Time      `json:"resolvedAt,omitempty"`
+	Findings   []Finding       `json:"findings,omitempty"`
+	Timeline   []IncidentEvent `json:"timeline,omitempty"`
+}
+type IncidentEvent struct {
+	At        time.Time `json:"at"`
+	Type      string    `json:"type"`
+	FindingID string    `json:"findingId"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	Severity  Severity  `json:"severity"`
+}
 type MaintenanceWindow struct {
 	ID          string    `json:"id"`
 	Description string    `json:"description"`
