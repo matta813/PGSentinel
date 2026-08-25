@@ -18,6 +18,8 @@
   .overview-top { grid-template-columns: 1fr 1fr; }
   .category-health { grid-template-columns: 160px 1fr; }
   .problem-toolbar { align-items: stretch; flex-direction: column; }
+	.audit-toolbar { align-items: stretch; flex-direction: column; }
+	.audit-toolbar .search-field { max-width: none; }
   .search-field { width: 100%; }
   .filter-controls { flex-wrap: wrap; }
   .finding > summary { grid-template-columns: 72px minmax(180px, 1fr) 84px 18px; }
@@ -28,6 +30,7 @@
   .server-row .server-property:nth-child(2) { display: none; }
   .row-actions { grid-column: 1 / -1; justify-content: flex-start; padding-left: 42px; }
   .settings-layout { grid-template-columns: 1fr; gap: var(--space-5); }
+	.incident-layout { grid-template-columns: 1fr; }
   .settings-nav { position: static; }
 }
 @media (max-width: 680px) {
@@ -54,7 +57,7 @@
   .finding-detail { padding: var(--space-4); }
   .evidence-grid { grid-template-columns: 1fr; }
   .finding-detail footer { align-items: flex-start; flex-direction: column; gap: var(--space-3); }
-  .form-grid, .form-grid.two { grid-template-columns: 1fr; }
+  .form-grid, .form-grid.two, .inline-control-form { grid-template-columns: 1fr; }
   .server-row { grid-template-columns: minmax(0, 1fr) 90px; }
   .server-row > .status-indicator { justify-self: end; }
   .row-actions { padding-left: 0; }
@@ -63,6 +66,11 @@
   .empty-action { grid-column: 2; justify-self: start; }
   .auth-screen { padding: var(--space-5); }
   .auth-card { padding: var(--space-5); }
+	.incident-row { grid-template-columns: 68px minmax(0, 1fr) 14px; }
+	.incident-row .finding-status { display: none; }
+	.incident-detail > header, .incident-detail > p, .incident-detail section { padding-left: var(--space-4); padding-right: var(--space-4); }
+	.incident-timeline li { grid-template-columns: 90px 10px minmax(0, 1fr); }
+	.audit-pagination { align-items: flex-start; flex-direction: column; gap: var(--space-3); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

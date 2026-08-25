@@ -15,14 +15,13 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
 - Deterministic notification routing by finding and server attributes, with cooldowns and bounded, redacted retry history.
 - Reset-aware persistent query-regression findings with explicit windows, sample sufficiency, workload deltas, and recovery handling.
+- Scoped maintenance windows, visible temporary suppressions, and safe threshold overrides with deterministic precedence.
+- LSN-aware replication gaps, WAL generation and retention trends, archive failures, recovery timelines, and PostgreSQL 17+ restartpoint intelligence.
+- Self-contained tiered metric retention with recent raw data, 15-minute operational history, and 6-hour long-term aggregates.
+- Conservative incident correlation with explained PostgreSQL relationships and chronological finding timelines.
+- Durable, secret-free audit history for authentication and operator configuration changes.
 
 ## Now
-
-### Extend replication and write-path health
-
-- Extend the shipped streaming state, lag, slot retention, and checkpoint rules with archiving failures and WAL generation trends.
-- Distinguish primary, standby, and intentionally delayed-replica behavior before assigning severity.
-- Keep every finding read-only, version-aware, and backed by the exact PostgreSQL evidence used to produce it.
 
 ### Make data freshness explicit
 
@@ -35,12 +34,14 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Support scoped rule thresholds, temporary suppressions, and maintenance windows by server, tag, category, or rule.
 - Preserve an audit trail and visible suppressed state; suppression must not delete evidence or silently rewrite finding history.
 - Validate configurations and provide safe defaults before exposing broad customization.
+### Expand query regression context
+
+- Retain longer regression windows and correlate the shipped interval-delta findings with deployments and configuration history.
+- Account for `pg_stat_statements` resets, minimum sample sizes, workload volume, and natural variance before creating a finding.
+- Explain the compared windows and contributing impact signals rather than presenting a context-free percentage.
 
 ## Next
 
-- Add tiered metric aggregation and configurable long-term retention.
-- Correlate related findings into cautious, evidence-weighted incident timelines.
-- Add a durable audit log for authentication, target configuration, routing changes, and finding state changes.
 - Introduce read-only and operator roles only when multi-user workflows can retain the current simple security boundary.
 - Export redacted diagnostic bundles that make support and analyzer feedback reproducible without exposing credentials or raw production queries.
 

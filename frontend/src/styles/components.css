@@ -85,6 +85,7 @@
 .notice svg { width: 14px; }
 .notice-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, var(--border-subtle)); }
 .notice-success { color: var(--success); }
+.notice-warning { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 35%, var(--border-subtle)); }
 .error-state { min-height: 92px; display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border-subtle)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger) 4%, var(--surface-1)); }
 .error-state > svg { width: 17px; color: var(--danger); }
 .error-state strong { font-size: 12px; }

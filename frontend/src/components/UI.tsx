@@ -9,8 +9,8 @@ export function SectionHeader({ title, description, action }: { title: string; d
   return <div className="section-header"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</div>
 }
 
-export function Notice({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'danger' | 'success' }) {
-  return <div className={`notice notice-${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>{tone === 'danger' && <TriangleAlert />}{children}</div>
+export function Notice({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'danger' | 'success' | 'warning' }) {
+  return <div className={`notice notice-${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>{(tone === 'danger' || tone === 'warning') && <TriangleAlert />}{children}</div>
 }
 
 export function EmptyState({ title, detail, action, positive = false }: { title: string; detail: string; action?: ReactNode; positive?: boolean }) {

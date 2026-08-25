@@ -169,6 +169,13 @@ func severityRank(value string) int {
 }
 
 func queueFindingNotification(ctx context.Context, tx *sql.Tx, finding models.Finding, eventType string) error {
+	maintenance, suppressed, _, controlErr := findingControl(ctx, tx, finding, time.Now().UTC())
+	if controlErr != nil {
+		return controlErr
+	}
+	if maintenance || suppressed {
+		return nil
+	}
 	var routeCount int
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM notification_routes`).Scan(&routeCount); err != nil {
 		return err
