@@ -56,25 +56,63 @@ type Suggestion struct {
 	Detail string `json:"detail,omitempty"`
 }
 type Finding struct {
-	ID          string       `json:"id"`
-	RuleID      string       `json:"ruleId"`
-	Fingerprint string       `json:"fingerprint"`
-	ServerID    string       `json:"serverId"`
-	Database    string       `json:"database,omitempty"`
-	Resource    string       `json:"resource,omitempty"`
-	Severity    Severity     `json:"severity"`
-	Category    string       `json:"category"`
-	Title       string       `json:"title"`
-	Summary     string       `json:"summary"`
-	Cause       string       `json:"cause"`
-	Impact      string       `json:"impact"`
-	Evidence    []Evidence   `json:"evidence"`
-	Suggestions []Suggestion `json:"suggestions"`
-	Confidence  Confidence   `json:"confidence"`
-	Status      string       `json:"status"`
-	StartedAt   time.Time    `json:"startedAt"`
-	UpdatedAt   time.Time    `json:"updatedAt"`
-	ResolvedAt  *time.Time   `json:"resolvedAt,omitempty"`
+	ID                string       `json:"id"`
+	RuleID            string       `json:"ruleId"`
+	Fingerprint       string       `json:"fingerprint"`
+	ServerID          string       `json:"serverId"`
+	Database          string       `json:"database,omitempty"`
+	Resource          string       `json:"resource,omitempty"`
+	Severity          Severity     `json:"severity"`
+	Category          string       `json:"category"`
+	Title             string       `json:"title"`
+	Summary           string       `json:"summary"`
+	Cause             string       `json:"cause"`
+	Impact            string       `json:"impact"`
+	Evidence          []Evidence   `json:"evidence"`
+	Suggestions       []Suggestion `json:"suggestions"`
+	Confidence        Confidence   `json:"confidence"`
+	Status            string       `json:"status"`
+	StartedAt         time.Time    `json:"startedAt"`
+	UpdatedAt         time.Time    `json:"updatedAt"`
+	ResolvedAt        *time.Time   `json:"resolvedAt,omitempty"`
+	Suppressed        bool         `json:"suppressed"`
+	SuppressionReason string       `json:"suppressionReason,omitempty"`
+	Maintenance       bool         `json:"maintenance"`
+}
+type MaintenanceWindow struct {
+	ID          string    `json:"id"`
+	Description string    `json:"description"`
+	ServerID    string    `json:"serverId,omitempty"`
+	ServerTag   string    `json:"serverTag,omitempty"`
+	Category    string    `json:"category,omitempty"`
+	RuleID      string    `json:"ruleId,omitempty"`
+	StartsAt    time.Time `json:"startsAt"`
+	EndsAt      time.Time `json:"endsAt"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	State       string    `json:"state"`
+}
+type FindingSuppression struct {
+	ID        string    `json:"id"`
+	FindingID string    `json:"findingId,omitempty"`
+	RuleID    string    `json:"ruleId,omitempty"`
+	ServerID  string    `json:"serverId,omitempty"`
+	ServerTag string    `json:"serverTag,omitempty"`
+	Reason    string    `json:"reason"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	State     string    `json:"state"`
+}
+type ThresholdOverride struct {
+	ID         string    `json:"id"`
+	RuleID     string    `json:"ruleId"`
+	ScopeType  string    `json:"scopeType"`
+	ScopeValue string    `json:"scopeValue"`
+	Reason     string    `json:"reason"`
+	Value      float64   `json:"value"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 type Metric struct {
 	ServerID    string            `json:"serverId"`

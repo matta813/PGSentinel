@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testAPI(t *testing.T) http.Handler {
@@ -49,6 +50,43 @@ func testAPI(t *testing.T) http.Handler {
 		}
 		handler.ServeHTTP(w, r)
 	})
+}
+
+func TestOperatorControlsAPIValidationAndLifecycle(t *testing.T) {
+	h := testAPI(t)
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"name":"prod","host":"db","user":"monitor","password":"secret","tags":["production"]}`)))
+	if r.Code != http.StatusCreated {
+		t.Fatalf("server=%d %s", r.Code, r.Body.String())
+	}
+	var server map[string]any
+	_ = json.Unmarshal(r.Body.Bytes(), &server)
+	serverID := server["id"].(string)
+	now := time.Now().UTC()
+	valid := fmt.Sprintf(`{"description":"Planned failover","serverId":%q,"category":"Replication","startsAt":%q,"endsAt":%q}`, serverID, now.Add(time.Minute).Format(time.RFC3339), now.Add(time.Hour).Format(time.RFC3339))
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/maintenance-windows", strings.NewReader(valid)))
+	if r.Code != http.StatusCreated || !strings.Contains(r.Body.String(), `"state":"upcoming"`) {
+		t.Fatalf("maintenance=%d %s", r.Code, r.Body.String())
+	}
+	for _, request := range []struct{ path, body string }{{"/api/v1/maintenance-windows", fmt.Sprintf(`{"description":"global","startsAt":%q,"endsAt":%q}`, now.Format(time.RFC3339), now.Add(time.Hour).Format(time.RFC3339))}, {"/api/v1/suppressions", fmt.Sprintf(`{"ruleId":"blocking-queries","reason":"global silence","expiresAt":%q}`, now.Add(time.Hour).Format(time.RFC3339))}, {"/api/v1/threshold-overrides", `{"ruleId":"standby-replay-lag","scopeType":"global","value":999999,"reason":"disable"}`}} {
+		r = httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, request.path, strings.NewReader(request.body)))
+		if r.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("%s=%d %s", request.path, r.Code, r.Body.String())
+		}
+	}
+	threshold := fmt.Sprintf(`{"ruleId":"standby-replay-lag","scopeType":"server","scopeValue":%q,"value":120,"reason":"Delayed reporting replica"}`, serverID)
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/threshold-overrides", strings.NewReader(threshold)))
+	if r.Code != http.StatusCreated {
+		t.Fatalf("threshold=%d %s", r.Code, r.Body.String())
+	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/threshold-overrides", nil))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), "Delayed reporting replica") || strings.Contains(r.Body.String(), "password") {
+		t.Fatalf("list=%d %s", r.Code, r.Body.String())
+	}
 }
 
 func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {

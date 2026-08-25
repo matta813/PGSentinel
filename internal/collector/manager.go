@@ -239,7 +239,14 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		m.log.Info("metadata collection complete", "server_id", server.ID)
 		return
 	}
-	findings := m.engine.Analyze(snapshot)
+	engine := m.engine
+	if overrides, overrideErr := m.store.EffectiveThresholdOverrides(ctx, server); overrideErr == nil {
+		engine = analyzer.New(analyzer.ApplyThresholdOverrides(analyzer.DefaultThresholds(), overrides))
+	} else {
+		complete = false
+		m.log.Warn("resolve analyzer thresholds", "server_id", server.ID, "error", overrideErr)
+	}
+	findings := engine.Analyze(snapshot)
 	findings = append(findings, regressionFindings...)
 	findings = append(findings, analyzer.IndexFindings(server.ID, snapshot.Indexes)...)
 	if err := m.reconcileFindings(ctx, server.ID, findings, complete); err != nil {
