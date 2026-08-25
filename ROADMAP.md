@@ -17,6 +17,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Scoped maintenance windows, visible temporary suppressions, and safe threshold overrides with deterministic precedence.
 - LSN-aware replication gaps, WAL generation and retention trends, archive failures, recovery timelines, and PostgreSQL 17+ restartpoint intelligence.
 - Self-contained tiered metric retention with recent raw data, 15-minute operational history, and 6-hour long-term aggregates.
+- Conservative incident correlation with explained PostgreSQL relationships and chronological finding timelines.
 
 ## Now
 
@@ -34,7 +35,6 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 
 ## Next
 
-- Correlate related findings into cautious, evidence-weighted incident timelines.
 - Add a durable audit log for authentication, target configuration, routing changes, and finding state changes.
 - Introduce read-only and operator roles only when multi-user workflows can retain the current simple security boundary.
 - Export redacted diagnostic bundles that make support and analyzer feedback reproducible without exposing credentials or raw production queries.

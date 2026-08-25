@@ -351,7 +351,10 @@ func (m *Manager) reconcileFindings(ctx context.Context, serverID string, findin
 	if !complete {
 		return nil
 	}
-	return m.store.UpsertFindings(ctx, serverID, findings)
+	if err := m.store.UpsertFindings(ctx, serverID, findings); err != nil {
+		return err
+	}
+	return m.store.RebuildIncidents(ctx, serverID, time.Now().UTC())
 }
 
 func (m *Manager) restoreSnapshot(ctx context.Context, serverID, kind string, value any) bool {

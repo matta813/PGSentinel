@@ -77,10 +77,16 @@ func TestMigration004UpgradesVersion060Schema(t *testing.T) {
 		}
 	}
 	var version int
-	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 7 {
+	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 8 {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 	for _, table := range []string{"maintenance_windows", "finding_suppressions", "threshold_overrides"} {
+		var count int
+		if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("table %s count=%d err=%v", table, count, err)
+		}
+	}
+	for _, table := range []string{"incidents", "incident_findings"} {
 		var count int
 		if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("table %s count=%d err=%v", table, count, err)
@@ -118,7 +124,7 @@ func TestMigration007AddsMetricAggregatesToVersion060Schema(t *testing.T) {
 	if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='metric_aggregates'`).Scan(&tableCount); err != nil || tableCount != 1 {
 		t.Fatalf("metric_aggregates count=%d err=%v", tableCount, err)
 	}
-	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 7 {
+	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 8 {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 }
