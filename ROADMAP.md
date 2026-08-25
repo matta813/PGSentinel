@@ -14,6 +14,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - A responsive light/dark interface, one-command Compose installer, hardened container defaults, protected CI, and automated release publication.
 - Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
 - Deterministic notification routing by finding and server attributes, with cooldowns and bounded, redacted retry history.
+- Scoped maintenance windows, visible temporary suppressions, and safe threshold overrides with deterministic precedence.
 - LSN-aware replication gaps, WAL generation and retention trends, archive failures, recovery timelines, and PostgreSQL 17+ restartpoint intelligence.
 
 ## Now
@@ -29,12 +30,6 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Retain longer regression windows and correlate the shipped interval-delta findings with deployments and configuration history.
 - Account for `pg_stat_statements` resets, minimum sample sizes, workload volume, and natural variance before creating a finding.
 - Explain the compared windows and contributing impact signals rather than presenting a context-free percentage.
-
-### Add operator controls for noisy periods
-
-- Support scoped rule thresholds, temporary suppressions, and maintenance windows by server, tag, category, or rule.
-- Preserve an audit trail and visible suppressed state; suppression must not delete evidence or silently rewrite finding history.
-- Validate configurations and provide safe defaults before exposing broad customization.
 
 ## Next
 

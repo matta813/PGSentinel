@@ -6,6 +6,7 @@
 - [Monitoring user](monitoring-user.md): PostgreSQL roles, TLS, and `pg_stat_statements`
 - [Health rules](health-rules.md): evidence, thresholds, confidence, and health scoring
 - [Notifications](notifications.md): destinations, routing rules, cooldowns, retries, and delivery history
+- [Operator controls](operator-controls.md): maintenance windows, suppressions, and scoped thresholds
 - [Releases](releases.md): release trains, versioning, images, notes, contributors, and automated publication
 - [Organic growth](growth.md): GitHub-native reports, human-reviewed release drafts, and maintainer guidance
 
