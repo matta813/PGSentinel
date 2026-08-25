@@ -121,6 +121,10 @@ type Metric struct {
 	Value       float64           `json:"value"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	CollectedAt time.Time         `json:"collectedAt"`
+	Minimum     *float64          `json:"minimum,omitempty"`
+	Maximum     *float64          `json:"maximum,omitempty"`
+	Samples     int               `json:"samples,omitempty"`
+	Resolution  string            `json:"resolution,omitempty"`
 }
 type NotificationDestination struct {
 	ID        string            `json:"id"`

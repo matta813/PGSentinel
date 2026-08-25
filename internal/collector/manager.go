@@ -17,8 +17,9 @@ import (
 )
 
 type Schedule struct {
-	Fast, Standard, Slow, Metadata, Retention time.Duration
-	FanoutLimit                               int
+	Fast, Standard, Slow, Metadata, Retention                      time.Duration
+	MetricRawRetention, MetricMediumRetention, MetricLongRetention time.Duration
+	FanoutLimit                                                    int
 }
 
 type collectionCycle uint8
@@ -64,6 +65,15 @@ func (s Schedule) normalized() Schedule {
 	if s.Retention <= 0 {
 		s.Retention = 30 * 24 * time.Hour
 	}
+	if s.MetricRawRetention <= 0 {
+		s.MetricRawRetention = 24 * time.Hour
+	}
+	if s.MetricMediumRetention < s.MetricRawRetention {
+		s.MetricMediumRetention = 30 * 24 * time.Hour
+	}
+	if s.MetricLongRetention < s.MetricMediumRetention {
+		s.MetricLongRetention = 365 * 24 * time.Hour
+	}
 	if s.FanoutLimit <= 0 {
 		s.FanoutLimit = 32
 	}
@@ -105,7 +115,9 @@ func (m *Manager) Run(ctx context.Context) {
 }
 
 func (m *Manager) prune(ctx context.Context, now time.Time) error {
-	return m.store.Prune(ctx, now.Add(-m.schedule.Retention))
+	return m.store.PruneMonitoringHistory(ctx, now, m.schedule.Retention, storage.MetricRetentionPolicy{
+		Raw: m.schedule.MetricRawRetention, Medium: m.schedule.MetricMediumRetention, Long: m.schedule.MetricLongRetention,
+	})
 }
 
 func (m *Manager) collectAll(ctx context.Context, cycle collectionCycle) {

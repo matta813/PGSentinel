@@ -25,6 +25,9 @@ type Config struct {
 	SlowInterval                    time.Duration
 	MetaInterval                    time.Duration
 	Retention                       time.Duration
+	MetricRawRetention              time.Duration
+	MetricMediumRetention           time.Duration
+	MetricLongRetention             time.Duration
 	FanoutDatabaseLimit             int
 	FrontendDir                     string
 }
@@ -39,6 +42,18 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	metricRawRetention, err := strictDuration("PGSENTINEL_METRIC_RAW_RETENTION", 24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	metricMediumRetention, err := strictDuration("PGSENTINEL_METRIC_MEDIUM_RETENTION", 30*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	metricLongRetention, err := strictDuration("PGSENTINEL_METRIC_LONG_RETENTION", 365*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
 	c := Config{
 		ListenAddr: env("PGSENTINEL_LISTEN_ADDR", ":8080"), DataDir: dataDir,
 		DatabasePath:  filepath.Join(dataDir, "pgsentinel.db"),
@@ -48,9 +63,12 @@ func Load() (Config, error) {
 		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
 		FastInterval:             duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
 		SlowInterval: duration("PGSENTINEL_SLOW_INTERVAL", 5*time.Minute), MetaInterval: duration("PGSENTINEL_META_INTERVAL", 30*time.Minute),
-		Retention:           duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
-		FanoutDatabaseLimit: positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
-		FrontendDir:         env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
+		Retention:             duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
+		MetricRawRetention:    metricRawRetention,
+		MetricMediumRetention: metricMediumRetention,
+		MetricLongRetention:   metricLongRetention,
+		FanoutDatabaseLimit:   positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
+		FrontendDir:           env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
 	}
 	if c.EncryptionKey == "" {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY is required; generate one with openssl rand -base64 32")
@@ -60,6 +78,15 @@ func Load() (Config, error) {
 	}
 	if len(c.BootstrapAdminPassword) < 12 {
 		return Config{}, fmt.Errorf("PGSENTINEL_ADMIN_PASSWORD must contain at least 12 characters")
+	}
+	if c.MetricRawRetention < time.Hour || c.MetricRawRetention > 30*24*time.Hour {
+		return Config{}, fmt.Errorf("PGSENTINEL_METRIC_RAW_RETENTION must be between 1h and 720h")
+	}
+	if c.MetricMediumRetention < c.MetricRawRetention || c.MetricMediumRetention > 180*24*time.Hour {
+		return Config{}, fmt.Errorf("PGSENTINEL_METRIC_MEDIUM_RETENTION must be at least the raw retention and no more than 4320h")
+	}
+	if c.MetricLongRetention < c.MetricMediumRetention || c.MetricLongRetention > 5*365*24*time.Hour {
+		return Config{}, fmt.Errorf("PGSENTINEL_METRIC_LONG_RETENTION must be at least the medium retention and no more than 43800h")
 	}
 	if err := os.MkdirAll(c.DataDir, 0o750); err != nil {
 		return Config{}, fmt.Errorf("create data directory: %w", err)
@@ -112,6 +139,17 @@ func duration(key string, fallback time.Duration) time.Duration {
 		return time.Duration(n) * time.Second
 	}
 	return fallback
+}
+func strictDuration(key string, fallback time.Duration) (time.Duration, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a valid duration: %w", key, err)
+	}
+	return d, nil
 }
 func positiveInt(key string, fallback int) int {
 	v := os.Getenv(key)
