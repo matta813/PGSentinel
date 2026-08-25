@@ -54,7 +54,7 @@
   .finding-detail { padding: var(--space-4); }
   .evidence-grid { grid-template-columns: 1fr; }
   .finding-detail footer { align-items: flex-start; flex-direction: column; gap: var(--space-3); }
-  .form-grid, .form-grid.two { grid-template-columns: 1fr; }
+  .form-grid, .form-grid.two, .inline-control-form { grid-template-columns: 1fr; }
   .server-row { grid-template-columns: minmax(0, 1fr) 90px; }
   .server-row > .status-indicator { justify-self: end; }
   .row-actions { padding-left: 0; }
