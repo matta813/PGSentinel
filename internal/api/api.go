@@ -83,6 +83,7 @@ func (a *API) routes() {
 	a.mux.HandleFunc("GET /api/v1/threshold-overrides", a.listThresholdOverrides)
 	a.mux.HandleFunc("POST /api/v1/threshold-overrides", a.createThresholdOverride)
 	a.mux.HandleFunc("DELETE /api/v1/threshold-overrides/{id}", a.deleteThresholdOverride)
+	a.mux.HandleFunc("GET /api/v1/audit-events", a.listAuditEvents)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}/{resource}", a.serverResource)
 }
 

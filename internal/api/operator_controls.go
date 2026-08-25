@@ -68,11 +68,12 @@ func (a *API) createMaintenanceWindow(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "Unable to create maintenance window", err)
 		return
 	}
+	a.audit(r, "", "maintenance_window.created", "maintenance_window", item.ID, "A maintenance window was created.")
 	item.State = temporalStateAPI(item.StartsAt, item.EndsAt, now)
 	write(w, 201, item)
 }
 func (a *API) deleteMaintenanceWindow(w http.ResponseWriter, r *http.Request) {
-	deleteOperatorControl(w, r, a.store.DeleteMaintenanceWindow, "Maintenance window")
+	a.deleteOperatorControl(w, r, a.store.DeleteMaintenanceWindow, "Maintenance window", "maintenance_window.deleted", "maintenance_window")
 }
 
 func (a *API) listSuppressions(w http.ResponseWriter, r *http.Request) {
@@ -148,11 +149,12 @@ func (a *API) createSuppression(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "Unable to create suppression", err)
 		return
 	}
+	a.audit(r, "", "suppression.created", "suppression", item.ID, "A temporary finding suppression was created; evidence remains retained.")
 	item.State = "active"
 	write(w, 201, item)
 }
 func (a *API) deleteSuppression(w http.ResponseWriter, r *http.Request) {
-	deleteOperatorControl(w, r, a.store.DeleteSuppression, "Suppression")
+	a.deleteOperatorControl(w, r, a.store.DeleteSuppression, "Suppression", "suppression.deleted", "suppression")
 }
 
 func (a *API) listThresholdOverrides(w http.ResponseWriter, r *http.Request) {
@@ -215,13 +217,14 @@ func (a *API) createThresholdOverride(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "A threshold override already exists for this scope", err)
 		return
 	}
+	a.audit(r, "", "threshold_override.created", "threshold_override", item.ID, "A scoped analyzer threshold override was created.")
 	write(w, 201, item)
 }
 func (a *API) deleteThresholdOverride(w http.ResponseWriter, r *http.Request) {
-	deleteOperatorControl(w, r, a.store.DeleteThresholdOverride, "Threshold override")
+	a.deleteOperatorControl(w, r, a.store.DeleteThresholdOverride, "Threshold override", "threshold_override.deleted", "threshold_override")
 }
 
-func deleteOperatorControl(w http.ResponseWriter, r *http.Request, remove func(context.Context, string) error, label string) {
+func (a *API) deleteOperatorControl(w http.ResponseWriter, r *http.Request, remove func(context.Context, string) error, label, action, resourceType string) {
 	id := r.PathValue("id")
 	if !validID(id) {
 		failure(w, 400, "Invalid "+strings.ToLower(label)+" ID", nil)
@@ -235,6 +238,7 @@ func deleteOperatorControl(w http.ResponseWriter, r *http.Request, remove func(c
 		}
 		return
 	}
+	a.audit(r, "", action, resourceType, id, "An operator control was removed.")
 	w.WriteHeader(http.StatusNoContent)
 }
 
