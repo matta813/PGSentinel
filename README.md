@@ -69,6 +69,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 - Encrypted ntfy and generic webhook destinations with delivery tests
 - Deterministic notification routing by severity, category, server, tags, and lifecycle transition
 - Dedupe-safe delivery with cooldowns, bounded retry history, and redacted failure visibility
+- Searchable, bounded audit history for security and operator configuration changes
 - Scoped maintenance windows, temporary suppressions, and validated per-server/tag analyzer thresholds
 - Low-cardinality Prometheus metrics plus health and readiness endpoints
 

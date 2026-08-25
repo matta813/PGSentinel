@@ -11,6 +11,15 @@ type User struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
+type AuditEvent struct {
+	ID           string    `json:"id"`
+	OccurredAt   time.Time `json:"occurredAt"`
+	Actor        string    `json:"actor"`
+	Action       string    `json:"action"`
+	ResourceType string    `json:"resourceType"`
+	ResourceID   string    `json:"resourceId,omitempty"`
+	Summary      string    `json:"summary"`
+}
 
 type Severity string
 

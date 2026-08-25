@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, ChevronRight, Database, FileSearch, Gauge, GitBranch, KeyRound, ListTree, Lock, LogOut, Menu, Moon, Search, Settings, Sun, Table2, Waves, X } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronRight, Database, FileSearch, Gauge, GitBranch, KeyRound, ListTree, Lock, LogOut, Menu, Moon, ScrollText, Search, Settings, Sun, Table2, Waves, X } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
@@ -7,9 +7,9 @@ import { useApi } from '../hooks/useApi'
 const groups = [
   { label: 'Monitor', items: [['/', 'Overview', Gauge], ['/problems', 'Problems', AlertTriangle], ['/incidents', 'Incidents', ListTree], ['/servers', 'Servers', Database]] },
   { label: 'Database', items: [['/queries', 'Queries', Search], ['/tables', 'Tables', Table2], ['/indexes', 'Indexes', KeyRound], ['/vacuum', 'Vacuum', Activity], ['/locks', 'Locks', Lock], ['/replication', 'Replication', GitBranch], ['/wal', 'WAL & archive', Waves]] },
-  { label: 'System', items: [['/settings', 'Settings', Settings]] },
+  { label: 'System', items: [['/audit', 'Audit log', ScrollText], ['/settings', 'Settings', Settings]] },
 ] as const
-const routeNames: Record<string, string> = { '/': 'Overview', '/problems': 'Problems', '/incidents': 'Incidents', '/servers': 'Servers', '/queries': 'Queries', '/tables': 'Tables', '/indexes': 'Indexes', '/vacuum': 'Vacuum', '/locks': 'Locks', '/replication': 'Replication', '/wal': 'WAL & archive', '/settings': 'Settings' }
+const routeNames: Record<string, string> = { '/': 'Overview', '/problems': 'Problems', '/incidents': 'Incidents', '/servers': 'Servers', '/audit': 'Audit log', '/queries': 'Queries', '/tables': 'Tables', '/indexes': 'Indexes', '/vacuum': 'Vacuum', '/locks': 'Locks', '/replication': 'Replication', '/wal': 'WAL & archive', '/settings': 'Settings' }
 
 export function AppLayout({ username, onLogout }: { username: string; onLogout: () => void }) {
   const [open, setOpen] = useState(false)

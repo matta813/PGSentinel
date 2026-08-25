@@ -110,6 +110,11 @@ func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to update problem", err)
 		return
 	}
+	if request.Status == "acknowledged" {
+		a.audit(r, "", "finding.acknowledged", "finding", id, "A finding was acknowledged; its evidence and health impact remain available.")
+	} else {
+		a.audit(r, "", "finding.reopened", "finding", id, "An acknowledged finding was returned to active triage.")
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 func (a *API) overview(w http.ResponseWriter, r *http.Request) {

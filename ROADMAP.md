@@ -18,6 +18,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - LSN-aware replication gaps, WAL generation and retention trends, archive failures, recovery timelines, and PostgreSQL 17+ restartpoint intelligence.
 - Self-contained tiered metric retention with recent raw data, 15-minute operational history, and 6-hour long-term aggregates.
 - Conservative incident correlation with explained PostgreSQL relationships and chronological finding timelines.
+- Durable, secret-free audit history for authentication and operator configuration changes.
 
 ## Now
 
@@ -35,7 +36,6 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 
 ## Next
 
-- Add a durable audit log for authentication, target configuration, routing changes, and finding state changes.
 - Introduce read-only and operator roles only when multi-user workflows can retain the current simple security boundary.
 - Export redacted diagnostic bundles that make support and analyzer feedback reproducible without exposing credentials or raw production queries.
 
