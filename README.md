@@ -65,6 +65,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 
 - Multiple PostgreSQL targets, tags, SSL modes, and connection diagnostics
 - Searchable operations inbox, 30-day raw snapshot retention, and bounded tiered metric history
+- Conservative incident grouping with explained relationships and chronological finding timelines
 - Encrypted ntfy and generic webhook destinations with delivery tests
 - Deterministic notification routing by severity, category, server, tags, and lifecycle transition
 - Dedupe-safe delivery with cooldowns, bounded retry history, and redacted failure visibility

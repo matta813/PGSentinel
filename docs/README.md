@@ -8,6 +8,7 @@
 - [Notifications](notifications.md): destinations, routing rules, cooldowns, retries, and delivery history
 - [Operator controls](operator-controls.md): maintenance windows, suppressions, and scoped thresholds
 - [Metric retention](metric-retention.md): local aggregation tiers, sizing, configuration, and upgrades
+- [Incident correlation](incidents.md): conservative grouping, lifecycle timelines, and API
 - [Releases](releases.md): release trains, versioning, images, notes, contributors, and automated publication
 - [Organic growth](growth.md): GitHub-native reports, human-reviewed release drafts, and maintainer guidance
 
