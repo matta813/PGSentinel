@@ -189,6 +189,12 @@ type QueryStat struct {
 	QueryID, Database, Query                                                                                                        string
 	Calls, TotalExecMS, MeanExecMS, MinExecMS, MaxExecMS, Rows, SharedHit, SharedRead, TempRead, TempWritten, WALBytes, ImpactScore float64
 }
+type QueryObservation struct {
+	CollectedAt       time.Time   `json:"collectedAt"`
+	StatsResetAt      *time.Time  `json:"statsResetAt,omitempty"`
+	PostmasterStartAt *time.Time  `json:"postmasterStartAt,omitempty"`
+	Queries           []QueryStat `json:"queries"`
+}
 type TableStat struct {
 	Database, Schema, Table                                                                                                             string
 	EstimatedRows, TotalSize, TableSize, IndexSize, LiveTuples, DeadTuples, SeqScans, IndexScans, Inserts, Updates, Deletes, HotUpdates float64
