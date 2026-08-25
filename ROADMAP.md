@@ -14,6 +14,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - A responsive light/dark interface, one-command Compose installer, hardened container defaults, protected CI, and automated release publication.
 - Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
 - Deterministic notification routing by finding and server attributes, with cooldowns and bounded, redacted retry history.
+- Reset-aware persistent query-regression findings with explicit windows, sample sufficiency, workload deltas, and recovery handling.
 
 ## Now
 
@@ -28,12 +29,6 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Track freshness and completeness per collector/resource instead of representing a target as only healthy or failed.
 - Surface partial collections and stale snapshots in the API and UI so cached evidence cannot be mistaken for current evidence.
 - Include freshness in confidence and health calculations without resolving findings merely because a collector temporarily failed.
-
-### Expand query regression context
-
-- Retain longer regression windows and correlate the shipped interval-delta findings with deployments and configuration history.
-- Account for `pg_stat_statements` resets, minimum sample sizes, workload volume, and natural variance before creating a finding.
-- Explain the compared windows and contributing impact signals rather than presenting a context-free percentage.
 
 ### Add operator controls for noisy periods
 
