@@ -2,6 +2,8 @@
 
 The screenshots in this directory are captured from the real React interface with synthetic API responses. They contain no production database names, queries, hosts, credentials, or user data.
 
+`pgsentinel-data-freshness.png` is reproducible with `node frontend/scripts/capture-data-freshness-screenshot.mjs`.
+
 ## Regenerate screenshots
 
 From the repository root:

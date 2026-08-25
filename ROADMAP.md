@@ -13,6 +13,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - A persistent administrator account, forced bootstrap-password replacement, hardened sessions, bounded API input, and SSRF-aware notification target policy.
 - A responsive light/dark interface, one-command Compose installer, hardened container defaults, protected CI, and automated release publication.
 - Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
+- Persistent per-resource collection freshness, visible stale/partial evidence, and conservative confidence and health-score caps.
 - Deterministic notification routing by finding and server attributes, with cooldowns and bounded, redacted retry history.
 
 ## Now
@@ -22,12 +23,6 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Extend the shipped streaming state, lag, slot retention, and checkpoint rules with archiving failures and WAL generation trends.
 - Distinguish primary, standby, and intentionally delayed-replica behavior before assigning severity.
 - Keep every finding read-only, version-aware, and backed by the exact PostgreSQL evidence used to produce it.
-
-### Make data freshness explicit
-
-- Track freshness and completeness per collector/resource instead of representing a target as only healthy or failed.
-- Surface partial collections and stale snapshots in the API and UI so cached evidence cannot be mistaken for current evidence.
-- Include freshness in confidence and health calculations without resolving findings merely because a collector temporarily failed.
 
 ### Expand query regression context
 

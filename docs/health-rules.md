@@ -12,6 +12,12 @@ Replication rules are role-aware. A recovery server is checked for a running, st
 
 Checkpoint analysis waits for at least ten observed checkpoints. It reports requested-checkpoint pressure when requested checkpoints are at least 20% of the total, and frequent checkpoints when their average interval since statistics reset is below five minutes. PostgreSQL 15–16 use `pg_stat_bgwriter`; PostgreSQL 17+ use `pg_stat_checkpointer`.
 
-If an optional collector section fails, PGSentinel preserves its last complete snapshot and does not resolve findings from incomplete evidence. The server becomes `degraded`, the estate score is capped at 75, and the UI distinguishes that state from healthy. A failed core collection becomes `error`; an unreachable target becomes `unreachable`, and the score is capped at 50. Cached evidence may therefore be older than the latest successful connection and should be interpreted with the displayed collection state.
+If an optional collector section fails, PGSentinel preserves its last complete snapshot and does not resolve findings from incomplete evidence. The server becomes `degraded`, and every affected resource is marked `partial` or `unavailable`. A previously successful resource becomes `stale` after twice its expected interval. The UI places this state and the last success directly beside the evidence.
+
+Finding confidence is reduced one level in API responses when its source evidence is not fresh. Estate health is capped at 75 for partial or stale evidence, 60 for an unavailable resource, and 50 for a failed or unreachable target. These caps are conservative: missing evidence must never make the displayed health look better, and a temporary collection failure must never resolve an existing finding.
+
+`GET /api/v1/servers/{id}/freshness` returns the fixed, bounded set of collection resources. It exposes timestamps, age, expected interval, state, last success and consecutive failures. It does not expose PostgreSQL credentials or raw connection errors.
+
+Migration 005 adds only the collection-status table and preserves all existing snapshots and findings. Downgrading to a binary that predates migration 005 leaves the table unused; removing it requires an explicit operator-managed database change and is not performed automatically.
 
 Unused indexes require zero observed scans, non-constraint status and at least 100 MiB. Scan counters reset and observation length matters; confidence is therefore Medium. Duplicate detection matches indexed columns, included columns and predicate, but operators, constraints and workload must still be checked. pgsentinel never drops an index.
