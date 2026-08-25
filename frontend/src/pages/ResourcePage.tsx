@@ -5,7 +5,7 @@ import { api } from '../api/client'
 import { Empty, ErrorState, Loading } from '../components/Status'
 import { PageHeader } from '../components/UI'
 import { useApi } from '../hooks/useApi'
-import type { IndexStat, LockInfo, QueryStat, Server, TableStat } from '../types'
+import type { CollectionResourceStatus, IndexStat, LockInfo, QueryStat, Server, TableStat } from '../types'
 
 const titles: Record<string, [string, string, string]> = { queries: ['Query performance', 'Queries', 'Total impact, latency, disk reads, temporary I/O, and WAL activity.'], tables: ['Table health', 'Tables', 'Storage footprint, access patterns, and tuple health across monitored tables.'], indexes: ['Index analysis', 'Indexes', 'Usage evidence and cautious identification of potentially unused indexes.'], vacuum: ['Vacuum health', 'Vacuum', 'Dead tuples and progress toward estimated autovacuum thresholds.'], locks: ['Live blocking', 'Locks', 'Current blocked sessions, their blockers, and blocking duration.'] }
 export function ResourcePage() {
@@ -14,14 +14,23 @@ export function ResourcePage() {
   const servers = useApi(() => api.get<Server[]>('/servers'), [])
   const selected = server || servers.data?.[0]?.id || ''
   const result = useApi(() => selected ? api.get<unknown[]>(`/servers/${selected}/${resource}`) : Promise.resolve([]), [selected, resource])
-  if (servers.loading || result.loading) return <Loading />
-  if (servers.error || result.error) return <ErrorState error={servers.error ?? result.error!} retry={result.reload} />
+  const freshness = useApi(() => selected ? api.get<CollectionResourceStatus[]>(`/servers/${selected}/freshness`) : Promise.resolve([]), [selected, resource])
+  if (servers.loading || result.loading || freshness.loading) return <Loading />
+  if (servers.error || result.error || freshness.error) return <ErrorState error={servers.error ?? result.error ?? freshness.error!} retry={result.reload} />
   const title = titles[resource] ?? ['Monitoring data', 'Evidence', 'Collected PostgreSQL evidence.']
   const currentServer = servers.data?.find(item => item.id === selected)
+  const quality = freshness.data?.find(item => item.resource === resource)
   return <><PageHeader title={title[0]} description={title[2]} actions={<label className="server-select"><Database /><span className="sr-only">Server</span><select aria-label="Server" value={selected} onChange={event => setServer(event.target.value)}>{servers.data?.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>} />
-    {selected && <div className="table-context"><div><strong>{title[1]}</strong><span>{result.data?.length ?? 0} rows · {currentServer?.name}</span></div><span><Info /> Latest collected snapshot</span></div>}
+    {selected && <><FreshnessNotice quality={quality} /><div className="table-context"><div><strong>{title[1]}</strong><span>{result.data?.length ?? 0} rows · {currentServer?.name}</span></div><span className={`freshness-state ${quality?.state ?? 'unavailable'}`}><Info /> {freshnessLabel(quality)}</span></div></>}
     {!selected ? <Empty title="No server configured" detail="Add a PostgreSQL server before viewing collected evidence." /> : <ResourceTable resource={resource} rows={result.data ?? []} />}</>
 }
+function FreshnessNotice({ quality }: { quality?: CollectionResourceStatus }) {
+  if (quality?.state === 'fresh') return null
+  const heading = quality?.state === 'stale' ? 'This evidence is stale' : quality?.state === 'partial' ? 'This evidence is incomplete' : 'Current evidence is unavailable'
+  return <div className={`freshness-notice ${quality?.state ?? 'unavailable'}`} role="status"><strong>{heading}</strong><span>{quality?.errorSummary || 'No successful collection has completed yet.'} {quality?.lastSuccessfulCollection && `Last success ${new Date(quality.lastSuccessfulCollection).toLocaleString()}.`}</span></div>
+}
+function freshnessLabel(quality?: CollectionResourceStatus) { if (!quality) return 'Not collected'; if (quality.state === 'fresh' && quality.ageSeconds !== undefined) return `Fresh · ${duration(quality.ageSeconds)} old`; return `${quality.state} · ${quality.consecutiveFailures} consecutive failure${quality.consecutiveFailures === 1 ? '' : 's'}` }
+function duration(seconds: number) { if (seconds < 60) return `${seconds}s`; if (seconds < 3600) return `${Math.floor(seconds / 60)}m`; return `${Math.floor(seconds / 3600)}h` }
 function ResourceTable({ resource, rows }: { resource: string; rows: unknown[] }) {
   if (rows.length === 0) return <Empty title="No data collected yet" detail="Evidence will appear after a successful monitoring cycle." />
   if (resource === 'queries') return <Table headers={['Query', 'Database', 'Calls', 'Avg latency', 'Total runtime', 'Impact']} numeric={[2, 3, 4, 5]} rows={(rows as QueryStat[]).map(query => [<code className="query-text" title={query.Query}>{query.Query}</code>, query.Database, fmt(query.Calls), `${fmt(query.MeanExecMS)} ms`, `${fmt(query.TotalExecMS)} ms`, query.ImpactScore.toFixed(1)])} />
