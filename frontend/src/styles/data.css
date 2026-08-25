@@ -30,7 +30,7 @@
 .finding-detail h3 { margin: 0 0 var(--space-2); font-size: 11px; font-weight: 600; }
 .finding-detail p { margin: 0 0 var(--space-2); color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
 .evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; background: var(--border-subtle); }
-.evidence-grid > div { padding: var(--space-3); background: var(--surface-1); }
+.evidence-grid > div, .evidence-grid > article { padding: var(--space-3); background: var(--surface-1); }
 .evidence-grid span, .evidence-grid strong { display: block; }
 .evidence-grid span { color: var(--text-muted); font-size: 9px; }
 .evidence-grid strong { margin-top: var(--space-1); font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 12px; font-weight: 500; }
