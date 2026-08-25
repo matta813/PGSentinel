@@ -77,7 +77,11 @@ func TestMigration004UpgradesVersion060Schema(t *testing.T) {
 		}
 	}
 	var version int
-	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 4 {
+	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 5 {
 		t.Fatalf("version=%d err=%v", version, err)
+	}
+	var freshnessTable int
+	if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='collection_resource_status'`).Scan(&freshnessTable); err != nil || freshnessTable != 1 {
+		t.Fatalf("freshness table count=%d err=%v", freshnessTable, err)
 	}
 }

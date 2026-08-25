@@ -81,6 +81,7 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to load problems", err)
 		return
 	}
+	a.attachFindingQuality(r, items)
 	write(w, 200, items)
 }
 func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
@@ -119,11 +120,13 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to load overview", err)
 		return
 	}
+	a.attachFindingQuality(r, findings)
 	counts := map[models.Severity]int{}
 	for _, f := range findings {
 		counts[f.Severity]++
 	}
 	score := analyzer.HealthScore(findings)
+	freshness := map[string][]models.CollectionResourceStatus{}
 	for _, server := range servers {
 		switch server.Status {
 		case "unreachable", "error":
@@ -135,8 +138,100 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 				score.Overall = 75
 			}
 		}
+		quality, qualityErr := a.store.ListCollectionResources(r.Context(), server.ID, time.Now())
+		if qualityErr == nil {
+			freshness[server.ID] = quality
+			for _, item := range quality {
+				if (item.State == "partial" || item.State == "stale") && score.Overall > 75 {
+					score.Overall = 75
+				}
+				if item.State == "unavailable" && score.Overall > 60 {
+					score.Overall = 60
+				}
+			}
+		}
 	}
-	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score})
+	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score, "freshness": freshness})
+}
+
+var monitoredResources = []string{"connections", "locks", "database-statistics", "queries", "tables", "indexes", "vacuum", "replication", "wal", "configuration"}
+
+func (a *API) serverFreshness(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validID(id) {
+		failure(w, 400, "Invalid server ID", nil)
+		return
+	}
+	if _, err := a.store.GetServer(r.Context(), id, false); err == sql.ErrNoRows {
+		failure(w, 404, "Server not found", nil)
+		return
+	} else if err != nil {
+		failure(w, 500, "Unable to load server", err)
+		return
+	}
+	items, err := a.store.ListCollectionResources(r.Context(), id, time.Now())
+	if err != nil {
+		failure(w, 500, "Unable to load collection freshness", err)
+		return
+	}
+	byResource := make(map[string]models.CollectionResourceStatus, len(items))
+	for _, item := range items {
+		byResource[item.Resource] = item
+	}
+	result := make([]models.CollectionResourceStatus, 0, len(monitoredResources))
+	for _, resource := range monitoredResources {
+		if item, ok := byResource[resource]; ok {
+			result = append(result, item)
+		} else {
+			result = append(result, models.CollectionResourceStatus{ServerID: id, Resource: resource, State: "unavailable", ErrorSummary: "No collection attempt has completed yet."})
+		}
+	}
+	write(w, 200, result)
+}
+
+func (a *API) attachFindingQuality(r *http.Request, findings []models.Finding) {
+	cache := map[string][]models.CollectionResourceStatus{}
+	for index := range findings {
+		serverID := findings[index].ServerID
+		items, ok := cache[serverID]
+		if !ok {
+			items, _ = a.store.ListCollectionResources(r.Context(), serverID, time.Now())
+			cache[serverID] = items
+		}
+		quality := qualityForFinding(findings[index], items)
+		if quality == nil {
+			continue
+		}
+		findings[index].EvidenceQuality = quality
+		if quality.State != "fresh" {
+			switch findings[index].Confidence {
+			case models.ConfidenceHigh:
+				findings[index].Confidence = models.ConfidenceMedium
+			case models.ConfidenceMedium:
+				findings[index].Confidence = models.ConfidenceLow
+			}
+		}
+	}
+}
+
+func qualityForFinding(finding models.Finding, items []models.CollectionResourceStatus) *models.CollectionResourceStatus {
+	resource := map[string]string{
+		"connection-utilization": "connections", "idle-in-transaction": "connections", "long-transaction": "connections",
+		"blocking-queries": "locks", "deadlocks": "database-statistics", "rollback-ratio": "database-statistics", "cache-hit": "database-statistics",
+		"dead-tuples": "vacuum", "vacuum-behind": "vacuum", "large-seq-scans": "tables", "stale-analyze": "tables",
+		"query-impact": "queries", "query-regression": "queries", "pgss-unavailable": "queries", "io-timing-disabled": "configuration",
+		"unused-index": "indexes", "duplicate-index": "indexes",
+	}[finding.RuleID]
+	if resource == "" {
+		resource = map[string]string{"Replication": "replication", "WAL": "wal"}[finding.Category]
+	}
+	for i := range items {
+		if items[i].Resource == resource {
+			item := items[i]
+			return &item
+		}
+	}
+	return nil
 }
 func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 	id, resource := r.PathValue("id"), r.PathValue("resource")

@@ -56,25 +56,26 @@ type Suggestion struct {
 	Detail string `json:"detail,omitempty"`
 }
 type Finding struct {
-	ID          string       `json:"id"`
-	RuleID      string       `json:"ruleId"`
-	Fingerprint string       `json:"fingerprint"`
-	ServerID    string       `json:"serverId"`
-	Database    string       `json:"database,omitempty"`
-	Resource    string       `json:"resource,omitempty"`
-	Severity    Severity     `json:"severity"`
-	Category    string       `json:"category"`
-	Title       string       `json:"title"`
-	Summary     string       `json:"summary"`
-	Cause       string       `json:"cause"`
-	Impact      string       `json:"impact"`
-	Evidence    []Evidence   `json:"evidence"`
-	Suggestions []Suggestion `json:"suggestions"`
-	Confidence  Confidence   `json:"confidence"`
-	Status      string       `json:"status"`
-	StartedAt   time.Time    `json:"startedAt"`
-	UpdatedAt   time.Time    `json:"updatedAt"`
-	ResolvedAt  *time.Time   `json:"resolvedAt,omitempty"`
+	ID              string                    `json:"id"`
+	RuleID          string                    `json:"ruleId"`
+	Fingerprint     string                    `json:"fingerprint"`
+	ServerID        string                    `json:"serverId"`
+	Database        string                    `json:"database,omitempty"`
+	Resource        string                    `json:"resource,omitempty"`
+	Severity        Severity                  `json:"severity"`
+	Category        string                    `json:"category"`
+	Title           string                    `json:"title"`
+	Summary         string                    `json:"summary"`
+	Cause           string                    `json:"cause"`
+	Impact          string                    `json:"impact"`
+	Evidence        []Evidence                `json:"evidence"`
+	Suggestions     []Suggestion              `json:"suggestions"`
+	Confidence      Confidence                `json:"confidence"`
+	Status          string                    `json:"status"`
+	StartedAt       time.Time                 `json:"startedAt"`
+	UpdatedAt       time.Time                 `json:"updatedAt"`
+	ResolvedAt      *time.Time                `json:"resolvedAt,omitempty"`
+	EvidenceQuality *CollectionResourceStatus `json:"evidenceQuality,omitempty"`
 }
 type Metric struct {
 	ServerID    string            `json:"serverId"`
@@ -83,6 +84,18 @@ type Metric struct {
 	Value       float64           `json:"value"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	CollectedAt time.Time         `json:"collectedAt"`
+}
+type CollectionResourceStatus struct {
+	ServerID                string     `json:"serverId"`
+	Resource                string     `json:"resource"`
+	State                   string     `json:"state"`
+	CollectedAt             *time.Time `json:"collectedAt,omitempty"`
+	LastAttemptAt           time.Time  `json:"lastAttemptAt"`
+	LastSuccessfulAt        *time.Time `json:"lastSuccessfulCollection,omitempty"`
+	AgeSeconds              *int64     `json:"ageSeconds,omitempty"`
+	ExpectedIntervalSeconds int64      `json:"expectedIntervalSeconds"`
+	ConsecutiveFailures     int        `json:"consecutiveFailures"`
+	ErrorSummary            string     `json:"errorSummary,omitempty"`
 }
 type NotificationDestination struct {
 	ID        string            `json:"id"`
