@@ -64,7 +64,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 ### Operations
 
 - Multiple PostgreSQL targets, tags, SSL modes, and connection diagnostics
-- Searchable operations inbox and 30-day raw snapshot retention by default
+- Searchable operations inbox, 30-day raw snapshot retention, and bounded tiered metric history
 - Encrypted ntfy and generic webhook destinations with delivery tests
 - Deterministic notification routing by severity, category, server, tags, and lifecycle transition
 - Dedupe-safe delivery with cooldowns, bounded retry history, and redacted failure visibility

@@ -10,6 +10,8 @@ Browser -> Go REST/SPA -> SQLite
 
 SQLite runs in WAL mode with one writer connection. Embedded, ordered SQL migrations make startup deterministic. Server credentials use AES-256-GCM with a SHA-256-derived key from the externally supplied master secret. API representations omit credentials.
 
+Metric maintenance runs hourly in one SQLite transaction. Raw samples age into 15-minute and 6-hour aggregates containing average, minimum, maximum, and sample count before the raw rows are deleted. Independent bounded retention windows delete expired aggregate tiers. History reads combine raw data with the finest retained aggregate and remain bounded by the API limit; the application never requires an external time-series service.
+
 Operational API routes require a user-bound administrator session. A new data volume bootstraps the built-in `admin` account from `PGSENTINEL_ADMIN_PASSWORD` and restricts its first session to replacing that password. Salted Argon2id credentials are persisted in SQLite; the environment value never overwrites an existing account. Random session tokens are delivered in HttpOnly, SameSite=Strict cookies and stored only as hashes in process memory; restarts intentionally sign every administrator out. Login attempts are rate-limited with bounded state, unknown usernames take the same expensive verification path, and forwarded client addresses are accepted only from explicitly trusted proxy CIDRs.
 
 Notification delivery uses a dedicated outbound policy. It rejects URL credentials and unsafe address ranges, disables ambient HTTP proxies, resolves targets at dial time, and validates redirects to reduce SSRF and DNS-rebinding risk. Exact private host allowlisting is available for trusted self-hosted providers.
