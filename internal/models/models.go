@@ -93,6 +93,40 @@ type NotificationDestination struct {
 	CreatedAt time.Time         `json:"createdAt"`
 	UpdatedAt time.Time         `json:"updatedAt"`
 }
+type NotificationRoute struct {
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	Enabled         bool      `json:"enabled"`
+	Priority        int       `json:"priority"`
+	Severities      []string  `json:"severities"`
+	Categories      []string  `json:"categories"`
+	ServerIDs       []string  `json:"serverIds"`
+	ServerTags      []string  `json:"serverTags"`
+	Transitions     []string  `json:"transitions"`
+	DestinationIDs  []string  `json:"destinationIds"`
+	CooldownSeconds int       `json:"cooldownSeconds"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+}
+type NotificationDeliveryHistory struct {
+	EventID         string     `json:"eventId"`
+	DestinationID   string     `json:"destinationId"`
+	DestinationName string     `json:"destinationName"`
+	EventType       string     `json:"eventType"`
+	FindingID       string     `json:"findingId"`
+	FindingTitle    string     `json:"findingTitle"`
+	ServerID        string     `json:"serverId"`
+	ServerName      string     `json:"serverName"`
+	Severity        string     `json:"severity"`
+	Category        string     `json:"category"`
+	Status          string     `json:"status"`
+	LastError       string     `json:"lastError,omitempty"`
+	Attempts        int        `json:"attempts"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	LastAttemptAt   *time.Time `json:"lastAttemptAt,omitempty"`
+	DeliveredAt     *time.Time `json:"deliveredAt,omitempty"`
+	NextAttemptAt   *time.Time `json:"nextAttemptAt,omitempty"`
+}
 type FindingNotificationDelivery struct {
 	EventID, DestinationID, EventType string
 	Finding                           Finding

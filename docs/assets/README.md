@@ -10,8 +10,9 @@ From the repository root:
 npm ci --prefix frontend
 npx --prefix frontend playwright install chromium
 npm --prefix frontend run screenshots
+npm --prefix frontend run screenshot:routing
 ```
 
-The capture script starts a local Vite process, intercepts `/api/v1` calls inside Playwright, and writes deterministic dark-theme images here. Review every changed image before committing it. Update the synthetic fixture in `frontend/scripts/capture-product-screenshots.mjs` when the UI intentionally changes.
+The capture scripts start a local Vite process, intercept `/api/v1` calls inside Playwright, and write deterministic dark-theme images here. Review every changed image before committing it. Update the corresponding synthetic fixture under `frontend/scripts/` when the UI intentionally changes.
 
 The browser download is a maintainer tool only. It is not part of the PGSentinel application image or runtime dependency set.

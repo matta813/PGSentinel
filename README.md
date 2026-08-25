@@ -66,7 +66,8 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 - Multiple PostgreSQL targets, tags, SSL modes, and connection diagnostics
 - Searchable operations inbox and 30-day raw snapshot retention by default
 - Encrypted ntfy and generic webhook destinations with delivery tests
-- Dedupe-safe notifications for new, escalated, reopened, and resolved High/Critical findings
+- Deterministic notification routing by severity, category, server, tags, and lifecycle transition
+- Dedupe-safe delivery with cooldowns, bounded retry history, and redacted failure visibility
 - Low-cardinality Prometheus metrics plus health and readiness endpoints
 
 ### Security and deployment
@@ -134,6 +135,7 @@ The published container stores configuration, encrypted credentials, snapshots, 
 | Create a safe PostgreSQL login | [Monitoring user](docs/monitoring-user.md) |
 | Understand findings and scores | [Health rules](docs/health-rules.md) |
 | Understand components and data flow | [Architecture](docs/architecture.md) |
+| Configure alert routing and delivery | [Notifications](docs/notifications.md) |
 | Build and test locally | [Development](docs/development.md) |
 | Publish or consume releases | [Releases](docs/releases.md) |
 | See current priorities | [Roadmap](ROADMAP.md) |

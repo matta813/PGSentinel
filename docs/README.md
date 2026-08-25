@@ -5,6 +5,7 @@
 - [Deployment](deployment.md): Compose, persistence, upgrades, backups, and hardening
 - [Monitoring user](monitoring-user.md): PostgreSQL roles, TLS, and `pg_stat_statements`
 - [Health rules](health-rules.md): evidence, thresholds, confidence, and health scoring
+- [Notifications](notifications.md): destinations, routing rules, cooldowns, retries, and delivery history
 - [Releases](releases.md): release trains, versioning, images, notes, contributors, and automated publication
 - [Organic growth](growth.md): GitHub-native reports, human-reviewed release drafts, and maintainer guidance
 

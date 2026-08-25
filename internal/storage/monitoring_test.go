@@ -119,6 +119,9 @@ func TestFindingNotificationRetriesAreBounded(t *testing.T) {
 		if err := s.RecordFindingNotification(ctx, pending[0].EventID, pending[0].DestinationID, errors.New("temporary failure")); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := s.DB.Exec(`UPDATE finding_notification_deliveries SET next_attempt_at='2000-01-01T00:00:00Z' WHERE status='retry'`); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if pending, _ := s.PendingFindingNotifications(ctx, 10); len(pending) != 0 {
 		t.Fatalf("delivery exceeded retry bound: %#v", pending)

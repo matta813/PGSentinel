@@ -35,7 +35,7 @@ func (d *Dispatcher) DispatchPending(ctx context.Context) {
 			d.log.Warn("record finding notification", "error", recordErr)
 		}
 		if err != nil {
-			d.log.Warn("deliver finding notification", "destination_id", item.DestinationID, "event_type", item.EventType, "error", err)
+			d.log.Warn("deliver finding notification", "destination_id", item.DestinationID, "event_type", item.EventType, "error", storage.SafeDeliveryError(err))
 		}
 	}
 }
