@@ -14,14 +14,9 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - A responsive light/dark interface, one-command Compose installer, hardened container defaults, protected CI, and automated release publication.
 - Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
 - Deterministic notification routing by finding and server attributes, with cooldowns and bounded, redacted retry history.
+- LSN-aware replication gaps, WAL generation and retention trends, archive failures, recovery timelines, and PostgreSQL 17+ restartpoint intelligence.
 
 ## Now
-
-### Extend replication and write-path health
-
-- Extend the shipped streaming state, lag, slot retention, and checkpoint rules with archiving failures and WAL generation trends.
-- Distinguish primary, standby, and intentionally delayed-replica behavior before assigning severity.
-- Keep every finding read-only, version-aware, and backed by the exact PostgreSQL evidence used to produce it.
 
 ### Make data freshness explicit
 
