@@ -56,7 +56,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 ### PostgreSQL visibility
 
 - Connections, transactions, databases, locks, tables, vacuum, indexes, and configuration
-- Role-aware replication, WAL retention, and checkpoint-pressure findings
+- Role-aware replication LSN gaps, slot retention growth, archive health, WAL rates, timelines, and checkpoint/restartpoint findings
 - Per-database table and index collection across a configurable number of databases
 - `pg_stat_statements` query load and multi-factor Query Impact Score
 - Duplicate and potentially unused index candidates with supporting evidence

@@ -13,6 +13,7 @@ npm ci --prefix frontend
 npx --prefix frontend playwright install chromium
 npm --prefix frontend run screenshots
 npm --prefix frontend run screenshot:routing
+npm --prefix frontend run screenshot:replication
 ```
 
 The capture scripts start a local Vite process, intercept `/api/v1` calls inside Playwright, and write deterministic dark-theme images here. Review every changed image before committing it. Update the corresponding synthetic fixture under `frontend/scripts/` when the UI intentionally changes.

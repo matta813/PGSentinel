@@ -138,6 +138,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	defer client.Close()
 	collector := NewCore(client.Pool())
 	snapshot := models.Snapshot{ServerID: server.ID, CollectedAt: time.Now().UTC(), Capabilities: map[string]bool{}}
+	snapshot.ServerTags = append([]string(nil), server.Tags...)
 	coreFresh := cycle&(cycleFast|cycleStandard) != 0
 	if coreFresh {
 		snapshot, err = collector.Collect(ctx, server.ID)
@@ -153,10 +154,13 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		return
 	}
 	if cycle&cycleStandard != 0 {
+		var previousReplication models.ReplicationStats
+		var previousWAL models.WALStats
+		_ = m.store.LatestSnapshot(ctx, server.ID, "replication", &previousReplication)
+		_ = m.store.LatestSnapshot(ctx, server.ID, "wal", &previousWAL)
 		replication, replicationErr := collector.CollectReplication(ctx)
 		if replicationErr == nil {
 			snapshot.Replication = replication
-			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", replication, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect replication", "server_id", server.ID, "error", replicationErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
@@ -164,12 +168,18 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		}
 		wal, walErr := collector.CollectWAL(ctx)
 		if walErr == nil {
+			if replicationErr == nil {
+				analyzer.EnrichWritePath(previousWAL, previousReplication, &wal, &snapshot.Replication)
+			}
 			snapshot.WAL = wal
 			_ = m.store.SaveSnapshot(ctx, server.ID, "wal", wal, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect WAL statistics", "server_id", server.ID, "error", walErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "wal", &snapshot.WAL)
 			complete = false
+		}
+		if replicationErr == nil {
+			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt)
 		}
 		queries, available, queryErr := collector.CollectQueries(ctx)
 		snapshot.Capabilities["pg_stat_statements"] = available
@@ -359,12 +369,29 @@ func restoreCapabilities(ctx context.Context, store *storage.Store, serverID str
 }
 
 func snapshotMetrics(s models.Snapshot) []models.Metric {
+	maxReplayLag, maxReplayBytes, retainedSlotBytes := 0.0, 0.0, 0.0
+	for _, standby := range s.Replication.Standbys {
+		if standby.ReplayLagSeconds > maxReplayLag {
+			maxReplayLag = standby.ReplayLagSeconds
+		}
+		if standby.PendingReplayBytes > maxReplayBytes {
+			maxReplayBytes = standby.PendingReplayBytes
+		}
+	}
+	for _, slot := range s.Replication.Slots {
+		retainedSlotBytes += slot.RetainedBytes
+	}
 	values := map[string]float64{
-		"connections.active":      float64(s.Connections.Active),
-		"connections.total":       float64(s.Connections.Total),
-		"connections.utilization": s.Connections.Utilization,
-		"connections.waiting":     float64(s.Connections.Waiting),
-		"server.uptime_seconds":   s.UptimeSeconds,
+		"connections.active":                   float64(s.Connections.Active),
+		"connections.total":                    float64(s.Connections.Total),
+		"connections.utilization":              s.Connections.Utilization,
+		"connections.waiting":                  float64(s.Connections.Waiting),
+		"server.uptime_seconds":                s.UptimeSeconds,
+		"wal.generation_bytes_per_second":      s.WAL.GenerationBytesPerSecond,
+		"wal.bytes_total":                      s.WAL.WALBytes,
+		"replication.max_replay_lag_seconds":   maxReplayLag,
+		"replication.max_pending_replay_bytes": maxReplayBytes,
+		"replication.slot_retained_bytes":      retainedSlotBytes,
 	}
 	out := make([]models.Metric, 0, len(values))
 	for name, value := range values {
