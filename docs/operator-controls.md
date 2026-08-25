@@ -29,4 +29,4 @@ Authenticated endpoints under `/api/v1` expose maintenance windows, suppressions
 
 Migration 006 adds three append-only control tables and preserves all existing findings, snapshots, notification state, and target configuration. A pre-migration binary ignores these tables; automatic downgrade or table deletion is intentionally not performed.
 
-The future durable audit-log feature can integrate at the centralized storage create/delete methods without changing control matching or API semantics. Until that feature lands, the control records retain their creation/update timestamps and reasons but are not represented as a separate immutable audit trail.
+Creating or deleting a maintenance window, suppression, or threshold override adds a fixed-summary event to the durable audit log. Operator-entered descriptions and reasons are deliberately excluded from audit summaries; the control record remains the authoritative location for that context.
