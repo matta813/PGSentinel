@@ -170,6 +170,24 @@
 .incident-timeline strong { font-size: 10px; }
 .incident-timeline span { color: var(--text-secondary); font-size: 10px; }
 .incident-timeline small { color: var(--text-muted); font-size: 9px; }
+.retention-note { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); font-size: 10px; }
+.retention-note svg { width: 14px; color: var(--accent); }
+.audit-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
+.audit-toolbar .search-field { flex: 1; max-width: 480px; }
+.audit-table { overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); }
+.audit-table table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.audit-table th { padding: var(--space-3); color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); text-align: left; background: var(--surface-2); font-size: 9px; font-weight: 500; white-space: nowrap; }
+.audit-table td { min-height: 48px; padding: var(--space-3); color: var(--text-secondary); border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.audit-table tr:last-child td { border-bottom: 0; }
+.audit-table td:first-child { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.audit-table td:nth-child(2) strong { color: var(--text-primary); font-size: 10px; }
+.audit-table code { color: var(--accent); font-size: 9px; white-space: nowrap; }
+.audit-table td:nth-child(4) { min-width: 135px; text-transform: capitalize; }
+.audit-table td:nth-child(4) small { display: block; max-width: 130px; margin-top: 2px; overflow: hidden; color: var(--text-muted); font-family: var(--font-mono); font-size: 8px; text-overflow: ellipsis; }
+.audit-table td:last-child { min-width: 260px; }
+.audit-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-3); color: var(--text-muted); font-size: 9px; }
+.audit-pagination > div { display: flex; gap: var(--space-2); }
+.audit-pagination svg { width: 12px; }
 
 .auth-screen { min-height: 100vh; display: grid; place-items: center; padding: var(--space-8); background: var(--bg-app); }
 .auth-shell { position: relative; width: min(390px, 100%); }
