@@ -147,17 +147,28 @@ type Snapshot struct {
 	Capabilities  map[string]bool   `json:"capabilities"`
 	Replication   ReplicationStats  `json:"replication"`
 	WAL           WALStats          `json:"wal"`
+	ServerTags    []string          `json:"serverTags,omitempty"`
 }
 
 type ReplicationStats struct {
-	InRecovery bool                 `json:"inRecovery"`
-	Standbys   []ReplicationStandby `json:"standbys"`
-	Receiver   *WALReceiver         `json:"receiver,omitempty"`
-	Slots      []ReplicationSlot    `json:"slots"`
+	InRecovery         bool                 `json:"inRecovery"`
+	TimelineID         int                  `json:"timelineId"`
+	RecoveryPaused     bool                 `json:"recoveryPaused"`
+	ReplayDelaySeconds float64              `json:"replayDelaySeconds"`
+	ReplayLSN          string               `json:"replayLsn,omitempty"`
+	ReceiveLSN         string               `json:"receiveLsn,omitempty"`
+	CollectedAt        time.Time            `json:"collectedAt"`
+	Standbys           []ReplicationStandby `json:"standbys"`
+	Receiver           *WALReceiver         `json:"receiver,omitempty"`
+	Slots              []ReplicationSlot    `json:"slots"`
 }
 type ReplicationStandby struct {
-	Application, ClientAddress, State, SyncState       string
-	WriteLagSeconds, FlushLagSeconds, ReplayLagSeconds float64
+	Application, ClientAddress, State, SyncState                               string
+	WriteLagSeconds, FlushLagSeconds, ReplayLagSeconds                         float64
+	SentLSN, WriteLSN, FlushLSN, ReplayLSN                                     string
+	PendingSendBytes, PendingWriteBytes, PendingFlushBytes, PendingReplayBytes float64
+	ReplyAgeSeconds                                                            float64
+	PendingReplayGrowthBytesPerSecond                                          float64
 }
 type WALReceiver struct {
 	Status, SenderHost, LatestEndLSN string
@@ -167,10 +178,21 @@ type ReplicationSlot struct {
 	Name, Type, Database, WALStatus string
 	Active                          bool
 	RetainedBytes                   float64
+	InactiveSeconds                 float64
+	RetainedGrowthBytesPerSecond    float64
 }
 type WALStats struct {
 	TimedCheckpoints, RequestedCheckpoints, WriteTimeMS, SyncTimeMS, BuffersWritten float64
 	StatsReset                                                                      *time.Time
+	WALRecords, WALFullPageImages, WALBytes, WALBuffersFull                         float64
+	WALStatsReset                                                                   *time.Time
+	ArchiveMode, CurrentLSN, LastArchivedWAL, LastFailedWAL                         string
+	ArchiveConfigured                                                               bool
+	ArchivedCount, FailedArchiveCount                                               float64
+	LastArchivedAt, LastFailedAt                                                    *time.Time
+	RestartpointsTimed, RestartpointsRequested, RestartpointsDone                   float64
+	CollectedAt                                                                     time.Time
+	GenerationBytesPerSecond, BufferFullEventsPerSecond                             float64
 }
 type ConnectionStats struct {
 	Active, Idle, IdleInTransaction, Waiting, Total, Max                  int
