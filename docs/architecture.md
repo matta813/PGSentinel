@@ -22,7 +22,9 @@ Finding lifecycle transitions are queued transactionally in SQLite. When no rout
 
 Delivery runs outside collectors and analyzers. Failed requests use bounded delayed retries and cannot roll back finding analysis. Per-finding destination cooldowns are evaluated during queueing. Delivery state is retained for the latest 2,000 destination events and the API returns at most 200 rows per request. Destination configuration stays encrypted and absent from list and history responses; target URLs in delivery errors are redacted before persistence and logging.
 
-Replication collection uses `pg_is_in_recovery()` to select role-appropriate evidence. Primaries read `pg_stat_replication` and `pg_replication_slots`; replicas read `pg_stat_wal_receiver`. Checkpoint counters come from `pg_stat_bgwriter` on PostgreSQL 15–16 and `pg_stat_checkpointer` on PostgreSQL 17+. All queries use the existing read-only monitoring connection.
+Replication collection uses `pg_is_in_recovery()` to select role-appropriate evidence. Primaries read `pg_stat_replication` and `pg_replication_slots`; replicas read `pg_stat_wal_receiver`, replay state, configured apply delay, and receive/replay LSNs. LSN differences are calculated inside PostgreSQL with `pg_wal_lsn_diff`. Timeline evidence comes from `pg_control_checkpoint()`.
+
+WAL collection reads `pg_stat_wal` and `pg_stat_archiver` without retrieving archive commands or library names. Consecutive snapshots with the same statistics reset timestamp derive WAL generation, replay-gap growth, and slot-retention growth rates. Reset counters and intervals shorter than ten seconds or longer than one hour do not produce rates. Checkpoint counters come from `pg_stat_bgwriter` on PostgreSQL 15–16 and `pg_stat_checkpointer` on PostgreSQL 17+, where restartpoint counters are also available. All queries use the existing read-only monitoring connection.
 
 The latest raw evidence is available from `GET /api/v1/servers/{id}/replication` and `GET /api/v1/servers/{id}/wal` for authenticated operator tooling. The problem inbox remains the primary UI and exposes only evidence that crossed a documented rule threshold.
 
