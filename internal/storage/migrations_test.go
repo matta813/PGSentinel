@@ -62,6 +62,9 @@ func TestMigration004UpgradesVersion060Schema(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO schema_migrations(version,applied_at) VALUES(1,'2026-01-01T00:00:00Z'),(2,'2026-01-01T00:00:00Z'),(3,'2026-01-01T00:00:00Z')`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`INSERT INTO users(id,username,password_hash,password_salt,must_change_password,created_at,updated_at) VALUES('existing-admin','admin',X'01',X'02',0,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +80,7 @@ func TestMigration004UpgradesVersion060Schema(t *testing.T) {
 		}
 	}
 	var version int
-	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 9 {
+	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 10 {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 	for _, table := range []string{"maintenance_windows", "finding_suppressions", "threshold_overrides"} {
@@ -99,6 +102,10 @@ func TestMigration004UpgradesVersion060Schema(t *testing.T) {
 	var auditTable int
 	if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='audit_events'`).Scan(&auditTable); err != nil || auditTable != 1 {
 		t.Fatalf("audit_events count=%d err=%v", auditTable, err)
+	}
+	var role string
+	if err := store.DB.QueryRow(`SELECT role FROM users WHERE id='existing-admin'`).Scan(&role); err != nil || role != "administrator" {
+		t.Fatalf("existing user role=%q err=%v", role, err)
 	}
 }
 
@@ -132,7 +139,7 @@ func TestMigration007AddsMetricAggregatesToVersion060Schema(t *testing.T) {
 	if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='metric_aggregates'`).Scan(&tableCount); err != nil || tableCount != 1 {
 		t.Fatalf("metric_aggregates count=%d err=%v", tableCount, err)
 	}
-	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 9 {
+	if err := store.DB.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 10 {
 		t.Fatalf("version=%d err=%v", version, err)
 	}
 }

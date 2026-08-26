@@ -3,13 +3,14 @@ package models
 import "time"
 
 type User struct {
-	ID                 string
-	Username           string
-	PasswordHash       []byte
-	PasswordSalt       []byte
-	MustChangePassword bool
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                 string    `json:"id"`
+	Username           string    `json:"username"`
+	Role               string    `json:"role"`
+	PasswordHash       []byte    `json:"-"`
+	PasswordSalt       []byte    `json:"-"`
+	MustChangePassword bool      `json:"mustChangePassword"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
 type AuditEvent struct {
 	ID           string    `json:"id"`

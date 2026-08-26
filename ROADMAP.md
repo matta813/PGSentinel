@@ -20,6 +20,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Conservative incident correlation with explained PostgreSQL relationships and chronological finding timelines.
 - Durable, secret-free audit history for authentication and operator configuration changes.
 - Persistent per-resource collection freshness, visible stale/partial evidence, and conservative confidence and health-score caps.
+- Server-enforced administrator, operator, and viewer roles with role-change session invalidation.
 
 ## Now
 
@@ -31,7 +32,6 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 
 ## Next
 
-- Introduce read-only and operator roles only when multi-user workflows can retain the current simple security boundary.
 - Export redacted diagnostic bundles that make support and analyzer feedback reproducible without exposing credentials or raw production queries.
 
 ## Later exploration
