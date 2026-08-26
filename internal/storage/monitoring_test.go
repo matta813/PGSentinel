@@ -39,6 +39,50 @@ func TestFindingLifecycle(t *testing.T) {
 	}
 }
 
+func TestRecentQueryObservationsAreChronologicalAndBounded(t *testing.T) {
+	s, ctx := testMonitoringStore(t, "query-observations")
+	server := models.Server{ID: "s", Name: "db", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
+	if err := s.CreateServer(ctx, &server); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
+	for index := 0; index < 55; index++ {
+		at := start.Add(time.Duration(index) * time.Minute)
+		observation := models.QueryObservation{CollectedAt: at, Queries: []models.QueryStat{{QueryID: "42", Calls: float64(index)}}}
+		if err := s.SaveSnapshot(ctx, server.ID, "query-regression", observation, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := s.RecentQueryObservations(ctx, server.ID, 1000)
+	if err != nil || len(items) != 50 {
+		t.Fatalf("len=%d err=%v", len(items), err)
+	}
+	if !items[0].CollectedAt.Before(items[len(items)-1].CollectedAt) || items[0].Queries[0].Calls != 5 {
+		t.Fatalf("order=%#v", items)
+	}
+}
+
+func TestOpenFindingsByRulePreservesOnlyRequestedAnalyzerState(t *testing.T) {
+	s, ctx := testMonitoringStore(t, "rule-findings")
+	server := models.Server{ID: "s", Name: "db", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}
+	if err := s.CreateServer(ctx, &server); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	var findings []models.Finding
+	for index, rule := range []string{"query-regression", "blocking-queries"} {
+		finding := models.Finding{ID: rule, RuleID: rule, Fingerprint: rule, ServerID: server.ID, Severity: models.SeverityHigh, Category: "Queries", Title: rule, StartedAt: now.Add(time.Duration(index) * time.Second), UpdatedAt: now}
+		findings = append(findings, finding)
+	}
+	if err := s.UpsertFindings(ctx, server.ID, findings); err != nil {
+		t.Fatal(err)
+	}
+	items, err := s.OpenFindingsByRule(ctx, server.ID, "query-regression")
+	if err != nil || len(items) != 1 || items[0].RuleID != "query-regression" {
+		t.Fatalf("items=%#v err=%v", items, err)
+	}
+}
+
 func TestFindingTransitionsQueueEachDestinationOnce(t *testing.T) {
 	s, ctx := testMonitoringStore(t, "finding-notifications")
 	server := models.Server{ID: "s", Name: "db", Host: "localhost", Port: 5432, User: "u", Password: "p", SSLMode: "disable"}

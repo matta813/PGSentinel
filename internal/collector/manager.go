@@ -202,12 +202,34 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		if replicationErr == nil {
 			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt)
 		}
-		queries, available, queryErr := collector.CollectQueries(ctx)
+		queries, available, statsReset, postmasterStart, queryErr := collector.CollectQueries(ctx)
 		snapshot.Capabilities["pg_stat_statements"] = available
 		if queryErr == nil {
-			history, historyErr := m.store.RecentQuerySnapshots(ctx, server.ID, 7)
+			history, historyErr := m.store.RecentQueryObservations(ctx, server.ID, 10)
 			if historyErr == nil {
-				regressionFindings = analyzer.QueryRegressionFindings(server.ID, history, queries)
+				current := models.QueryObservation{CollectedAt: snapshot.CollectedAt, StatsResetAt: statsReset, PostmasterStartAt: postmasterStart, Queries: queries}
+				regressionFindings = analyzer.QueryRegressionFindings(server.ID, history, current)
+				preserved, preserveErr := m.store.OpenFindingsByRule(ctx, server.ID, "query-regression")
+				if preserveErr != nil {
+					complete = false
+				} else {
+					active := map[string]bool{}
+					for _, finding := range regressionFindings {
+						active[finding.Fingerprint] = true
+					}
+					for _, finding := range preserved {
+						if !active[finding.Fingerprint] && !analyzer.QueryRegressionFindingReady(finding, history, current) {
+							regressionFindings = append(regressionFindings, finding)
+						}
+					}
+				}
+				if saveErr := m.store.SaveSnapshot(ctx, server.ID, "query-regression", current, snapshot.CollectedAt); saveErr != nil {
+					complete = false
+					m.log.Warn("save query regression observation", "server_id", server.ID, "error", saveErr)
+				}
+			} else {
+				complete = false
+				m.log.Warn("load query regression history", "server_id", server.ID, "error", historyErr)
 			}
 			snapshot.Queries = queries
 			_ = m.store.SaveSnapshot(ctx, server.ID, "queries", queries, snapshot.CollectedAt)

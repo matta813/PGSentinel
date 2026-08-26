@@ -59,6 +59,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 - Role-aware replication LSN gaps, slot retention growth, archive health, WAL rates, timelines, and checkpoint/restartpoint findings
 - Per-database table and index collection across a configurable number of databases
 - `pg_stat_statements` query load and multi-factor Query Impact Score
+- Reset-aware query regression detection with persistent anomalies, explicit comparison windows, and workload evidence
 - Duplicate and potentially unused index candidates with supporting evidence
 
 ### Operations

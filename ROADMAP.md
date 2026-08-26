@@ -14,6 +14,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - A responsive light/dark interface, one-command Compose installer, hardened container defaults, protected CI, and automated release publication.
 - Role-aware replication/WAL collection, conservative query-regression findings, explicit degraded collection state, and lifecycle notification delivery.
 - Deterministic notification routing by finding and server attributes, with cooldowns and bounded, redacted retry history.
+- Reset-aware persistent query-regression findings with explicit windows, sample sufficiency, workload deltas, and recovery handling.
 - Scoped maintenance windows, visible temporary suppressions, and safe threshold overrides with deterministic precedence.
 - LSN-aware replication gaps, WAL generation and retention trends, archive failures, recovery timelines, and PostgreSQL 17+ restartpoint intelligence.
 - Self-contained tiered metric retention with recent raw data, 15-minute operational history, and 6-hour long-term aggregates.
@@ -24,6 +25,11 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 
 ## Now
 
+### Make data freshness explicit
+
+- Track freshness and completeness per collector/resource instead of representing a target as only healthy or failed.
+- Surface partial collections and stale snapshots in the API and UI so cached evidence cannot be mistaken for current evidence.
+- Include freshness in confidence and health calculations without resolving findings merely because a collector temporarily failed.
 ### Expand query regression context
 
 - Retain longer regression windows and correlate the shipped interval-delta findings with deployments and configuration history.

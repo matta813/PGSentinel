@@ -2,6 +2,7 @@
 
 The screenshots in this directory are captured from the real React interface with synthetic API responses. They contain no production database names, queries, hosts, credentials, or user data.
 
+`pgsentinel-query-regression.png` is reproducible with `node frontend/scripts/capture-query-regression-screenshot.mjs`.
 `pgsentinel-data-freshness.png` is reproducible with `node frontend/scripts/capture-data-freshness-screenshot.mjs`.
 
 `pgsentinel-operator-controls.png` is reproducible with `node frontend/scripts/capture-operator-controls-screenshot.mjs`.
