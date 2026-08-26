@@ -89,6 +89,10 @@ func TestMigration004UpgradesVersion060Schema(t *testing.T) {
 			t.Fatalf("table %s count=%d err=%v", table, count, err)
 		}
 	}
+	var freshnessTable int
+	if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='collection_resource_status'`).Scan(&freshnessTable); err != nil || freshnessTable != 1 {
+		t.Fatalf("freshness table count=%d err=%v", freshnessTable, err)
+	}
 	for _, table := range []string{"incidents", "incident_findings"} {
 		var count int
 		if err := store.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count); err != nil || count != 1 {

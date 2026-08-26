@@ -19,15 +19,10 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Self-contained tiered metric retention with recent raw data, 15-minute operational history, and 6-hour long-term aggregates.
 - Conservative incident correlation with explained PostgreSQL relationships and chronological finding timelines.
 - Durable, secret-free audit history for authentication and operator configuration changes.
+- Persistent per-resource collection freshness, visible stale/partial evidence, and conservative confidence and health-score caps.
 - Server-enforced administrator, operator, and viewer roles with role-change session invalidation.
 
 ## Now
-
-### Make data freshness explicit
-
-- Track freshness and completeness per collector/resource instead of representing a target as only healthy or failed.
-- Surface partial collections and stale snapshots in the API and UI so cached evidence cannot be mistaken for current evidence.
-- Include freshness in confidence and health calculations without resolving findings merely because a collector temporarily failed.
 
 ### Expand query regression context
 
