@@ -15,3 +15,9 @@ test('reports an actionable error when an API route returns the SPA document', a
     status: 200,
   }))
 })
+
+test('accepts JSON when an intermediary omits the JSON content type', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify([{ id: 'incident-1' }])))
+
+  await expect(api.get('/incidents')).resolves.toEqual([{ id: 'incident-1' }])
+})
