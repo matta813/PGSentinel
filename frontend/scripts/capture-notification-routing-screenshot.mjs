@@ -17,7 +17,7 @@ try {
   await page.route('**/api/v1/**', async intercepted => {
     const pathname = new URL(intercepted.request().url()).pathname
     const bodies = {
-      '/api/v1/auth/session': { authenticated: true, username: 'admin', mustChangePassword: false },
+      '/api/v1/auth/session': { authenticated: true, username: 'admin', role: 'administrator', mustChangePassword: false },
       '/api/v1/version': { version: '0.6.0', commit: 'demo' },
       '/api/v1/notifications': [{ id: 'pager', provider: 'webhook', name: 'Pager webhook', enabled: true, createdAt: now, updatedAt: now }, { id: 'dba', provider: 'ntfy', name: 'DBA operations', enabled: true, createdAt: now, updatedAt: now }],
       '/api/v1/notification-routes': [{ id: 'route', name: 'Critical production findings', enabled: true, priority: 10, severities: ['CRITICAL'], categories: [], serverIds: [], serverTags: ['production'], transitions: ['new', 'severity_increased', 'reopened'], destinationIds: ['pager', 'dba'], cooldownSeconds: 300, createdAt: now, updatedAt: now }],

@@ -8,6 +8,7 @@
 - [Notifications](notifications.md): destinations, routing rules, cooldowns, retries, and delivery history
 - [Operator controls](operator-controls.md): maintenance windows, suppressions, and scoped thresholds
 - [Audit log](audit-log.md): recorded actions, secret boundaries, search, and retention
+- [Access control](access-control.md): administrator, operator, and viewer permissions
 - [Metric retention](metric-retention.md): local aggregation tiers, sizing, configuration, and upgrades
 - [Incident correlation](incidents.md): conservative grouping, lifecycle timelines, and API
 - [Releases](releases.md): release trains, versioning, images, notes, contributors, and automated publication

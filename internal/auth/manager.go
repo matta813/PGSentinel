@@ -76,6 +76,7 @@ type Manager struct {
 type Session struct {
 	UserID             string    `json:"-"`
 	Username           string    `json:"username"`
+	Role               string    `json:"role"`
 	MustChangePassword bool      `json:"mustChangePassword"`
 	ExpiresAt          time.Time `json:"-"`
 }
@@ -177,10 +178,40 @@ func (m *Manager) Start(w http.ResponseWriter, user models.User) error {
 	expires := m.now().Add(m.ttl)
 	m.mu.Lock()
 	m.pruneLocked()
-	m.sessions[hash] = Session{UserID: user.ID, Username: user.Username, MustChangePassword: user.MustChangePassword, ExpiresAt: expires}
+	m.sessions[hash] = Session{UserID: user.ID, Username: user.Username, Role: user.Role, MustChangePassword: user.MustChangePassword, ExpiresAt: expires}
 	m.mu.Unlock()
 	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: token, Path: "/", Expires: expires, MaxAge: int(m.ttl.Seconds()), HttpOnly: true, Secure: m.secure, SameSite: http.SameSiteStrictMode})
 	return nil
+}
+
+func (m *Manager) CreateUser(ctx context.Context, username, password, role string) (models.User, error) {
+	username = strings.TrimSpace(username)
+	if username == "" || len(username) > 100 || len(password) < MinimumPasswordLength || !ValidRole(role) {
+		return models.User{}, ErrInvalidCredentials
+	}
+	salt, err := randomSalt()
+	if err != nil {
+		return models.User{}, err
+	}
+	user := models.User{ID: uuid.NewString(), Username: username, Role: role, PasswordHash: derivePassword(password, salt), PasswordSalt: salt, MustChangePassword: true}
+	if err := m.store.CreateUser(ctx, &user); err != nil {
+		return models.User{}, err
+	}
+	return user, nil
+}
+
+func (m *Manager) InvalidateUser(userID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for token, session := range m.sessions {
+		if session.UserID == userID {
+			delete(m.sessions, token)
+		}
+	}
+}
+
+func ValidRole(role string) bool {
+	return role == "administrator" || role == "operator" || role == "viewer"
 }
 
 func (m *Manager) Valid(r *http.Request) bool {
@@ -275,7 +306,7 @@ func (m *Manager) ensureBootstrapUser(ctx context.Context, username, password st
 	if err != nil {
 		return fmt.Errorf("generate bootstrap password salt: %w", err)
 	}
-	user := models.User{ID: uuid.NewString(), Username: username, PasswordHash: derivePassword(password, salt), PasswordSalt: salt, MustChangePassword: true}
+	user := models.User{ID: uuid.NewString(), Username: username, Role: "administrator", PasswordHash: derivePassword(password, salt), PasswordSalt: salt, MustChangePassword: true}
 	if err := m.store.CreateUser(ctx, &user); err != nil {
 		return fmt.Errorf("create bootstrap user: %w", err)
 	}
