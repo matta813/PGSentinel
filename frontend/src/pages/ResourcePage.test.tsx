@@ -17,3 +17,18 @@ test('warns before rendering cached evidence as current', async () => {
   expect(screen.getByText('Current evidence is unavailable')).toBeInTheDocument()
   expect(screen.getByText(/last successful evidence is preserved/i)).toBeInTheDocument()
 })
+
+test('renders resource data when optional freshness metadata is unavailable', async () => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+    const url = String(input)
+    if (url.endsWith('/servers')) return new Response(JSON.stringify([{ id: 'server-1', name: 'Primary', status: 'healthy', tags: [] }]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (url.endsWith('/queries')) return new Response(JSON.stringify([{ QueryID: '1', Query: 'select 1', Database: 'app', Calls: 20, MeanExecMS: 3, TotalExecMS: 60, ImpactScore: 1 }]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Resource not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+  })
+
+  render(<MemoryRouter initialEntries={['/queries']}><Routes><Route path="/:resource" element={<ResourcePage />} /></Routes></MemoryRouter>)
+
+  expect(await screen.findByText('select 1')).toBeInTheDocument()
+  expect(screen.queryByText('Unable to load data')).not.toBeInTheDocument()
+  expect(screen.getByText('Current evidence is unavailable')).toBeInTheDocument()
+})
