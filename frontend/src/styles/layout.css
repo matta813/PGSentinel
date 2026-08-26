@@ -47,3 +47,6 @@
 .text-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 500; text-decoration: none; transition: color var(--transition); }
 .text-link:hover { color: var(--accent); }
 .text-link svg { width: 13px; }
+.account-label { display: grid; line-height: 1.1; }
+.account-label small { color: var(--text-muted); font-size: 8px; text-transform: capitalize; }
+.single-column { max-width: 980px; }

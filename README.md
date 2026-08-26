@@ -70,12 +70,13 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 - Deterministic notification routing by severity, category, server, tags, and lifecycle transition
 - Dedupe-safe delivery with cooldowns, bounded retry history, and redacted failure visibility
 - Searchable, bounded audit history for security and operator configuration changes
+- Local administrator, operator, and read-only viewer roles with server-side enforcement
 - Scoped maintenance windows, temporary suppressions, and validated per-server/tag analyzer thresholds
 - Low-cardinality Prometheus metrics plus health and readiness endpoints
 
 ### Security and deployment
 
-- AES-256-GCM encrypted target credentials and Argon2id administrator passwords
+- AES-256-GCM encrypted target credentials and Argon2id user passwords
 - Single-container deployment with a non-root user, read-only root filesystem, and dropped capabilities
 - SSRF-aware notification delivery and explicit private-target allowlisting
 - GitHub Actions CI, CodeQL, dependency review, vulnerability scanning, and automated releases

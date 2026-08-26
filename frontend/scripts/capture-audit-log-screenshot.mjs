@@ -25,7 +25,7 @@ try {
   await page.route('**/api/v1/**', async route => {
     const pathname = new URL(route.request().url()).pathname
     let body
-    if (pathname === '/api/v1/auth/session') body = { authenticated: true, username: 'admin', mustChangePassword: false }
+    if (pathname === '/api/v1/auth/session') body = { authenticated: true, username: 'admin', role: 'administrator', mustChangePassword: false }
     else if (pathname === '/api/v1/version') body = { version: '0.6.0', commit: 'demo' }
     else if (pathname === '/api/v1/audit-events') body = events
     await route.fulfill({ status: body ? 200 : 404, contentType: 'application/json', body: JSON.stringify(body ?? { error: 'Not found' }) })

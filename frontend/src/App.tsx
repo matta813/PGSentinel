@@ -11,6 +11,7 @@ import { ResourcePage } from './pages/ResourcePage'
 import { ServersPage } from './pages/ServersPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
+import { UsersPage } from './pages/UsersPage'
 import type { AuthSession } from './types/auth'
 
 export function App() {
@@ -24,5 +25,5 @@ export function App() {
   if (authentication === 'loading') return <div className="auth-screen"><div className="auth-loading">Loading PGSentinel…</div></div>
   if (authentication === 'anonymous') return <LoginPage onAuthenticated={setAuthentication} />
   if (authentication.mustChangePassword) return <ChangePasswordPage username={authentication.username} onChanged={() => setAuthentication({ ...authentication, mustChangePassword: false })} onLogout={() => setAuthentication('anonymous')} />
-  return <Routes><Route element={<AppLayout username={authentication.username} onLogout={() => setAuthentication('anonymous')} />}><Route index element={<OverviewPage />} /><Route path="problems" element={<ProblemsPage />} /><Route path="incidents" element={<IncidentsPage />} /><Route path="servers" element={<ServersPage />} /><Route path="audit" element={<AuditPage />} /><Route path=":resource" element={<ResourcePage />} /><Route path="settings" element={<SettingsPage />} /></Route></Routes>
+  return <Routes><Route element={<AppLayout username={authentication.username} role={authentication.role} onLogout={() => setAuthentication('anonymous')} />}><Route index element={<OverviewPage />} /><Route path="problems" element={<ProblemsPage />} /><Route path="incidents" element={<IncidentsPage />} /><Route path="servers" element={<ServersPage />} />{authentication.role === 'administrator' && <><Route path="audit" element={<AuditPage />} /><Route path="users" element={<UsersPage currentUser={authentication.username} />} /><Route path="settings" element={<SettingsPage />} /></>}<Route path=":resource" element={<ResourcePage />} /></Route></Routes>
 }
