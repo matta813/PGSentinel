@@ -145,6 +145,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	if err != nil {
 		m.log.Warn("postgres collection failed", "server_id", server.ID, "error", err)
 		_ = m.store.UpdateServerStatus(ctx, server.ID, "unreachable", server.Version, err.Error(), false)
+		m.recordCycleUnavailable(ctx, server.ID, cycle)
 		return
 	}
 	defer client.Close()
@@ -156,8 +157,11 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		snapshot, err = collector.Collect(ctx, server.ID)
 		if err != nil {
 			m.recordCollectionFailure(ctx, server, err)
+			m.recordCycleUnavailable(ctx, server.ID, cycle)
 			return
 		}
+		m.recordFresh(ctx, server.ID, "connections", m.schedule.Fast, snapshot.CollectedAt)
+		m.recordFresh(ctx, server.ID, "database-statistics", m.schedule.Fast, snapshot.CollectedAt)
 		if cycle&cycleStandard == 0 {
 			restoreCapabilities(ctx, m.store, server.ID, &snapshot)
 		}
@@ -173,10 +177,13 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		replication, replicationErr := collector.CollectReplication(ctx)
 		if replicationErr == nil {
 			snapshot.Replication = replication
+			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", replication, snapshot.CollectedAt)
+			m.recordFresh(ctx, server.ID, "replication", m.schedule.Standard, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect replication", "server_id", server.ID, "error", replicationErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
 			complete = false
+			m.recordUnavailable(ctx, server.ID, "replication", m.schedule.Standard, snapshot.CollectedAt)
 		}
 		wal, walErr := collector.CollectWAL(ctx)
 		if walErr == nil {
@@ -185,10 +192,12 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			}
 			snapshot.WAL = wal
 			_ = m.store.SaveSnapshot(ctx, server.ID, "wal", wal, snapshot.CollectedAt)
+			m.recordFresh(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect WAL statistics", "server_id", server.ID, "error", walErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "wal", &snapshot.WAL)
 			complete = false
+			m.recordUnavailable(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
 		}
 		if replicationErr == nil {
 			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt)
@@ -224,10 +233,12 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			}
 			snapshot.Queries = queries
 			_ = m.store.SaveSnapshot(ctx, server.ID, "queries", queries, snapshot.CollectedAt)
+			m.recordFresh(ctx, server.ID, "queries", m.schedule.Standard, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect queries", "server_id", server.ID, "error", queryErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "queries", &snapshot.Queries)
 			complete = false
+			m.recordUnavailable(ctx, server.ID, "queries", m.schedule.Standard, snapshot.CollectedAt)
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
@@ -239,10 +250,12 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		if lockErr == nil {
 			snapshot.Locks = locks
 			_ = m.store.SaveSnapshot(ctx, server.ID, "locks", snapshot.Locks, snapshot.CollectedAt)
+			m.recordFresh(ctx, server.ID, "locks", m.schedule.Fast, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect locks", "server_id", server.ID, "error", lockErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
 			complete = false
+			m.recordUnavailable(ctx, server.ID, "locks", m.schedule.Fast, snapshot.CollectedAt)
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
@@ -253,10 +266,16 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			snapshot.Tables, snapshot.Indexes = tables, indexes
 			_ = m.store.SaveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt)
 			_ = m.store.SaveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt)
+			for _, resource := range []string{"tables", "indexes", "vacuum"} {
+				m.recordFresh(ctx, server.ID, resource, m.schedule.Slow, snapshot.CollectedAt)
+			}
 		} else {
 			_ = m.restoreSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
 			_ = m.restoreSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes)
 			complete = false
+			for _, resource := range []string{"tables", "indexes", "vacuum"} {
+				m.recordPartial(ctx, server.ID, resource, m.schedule.Slow, snapshot.CollectedAt)
+			}
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
@@ -267,10 +286,12 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		if settingsErr == nil {
 			snapshot.Settings = settings
 			_ = m.store.SaveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt)
+			m.recordFresh(ctx, server.ID, "configuration", m.schedule.Metadata, snapshot.CollectedAt)
 		} else {
 			m.log.Warn("collect configuration", "server_id", server.ID, "error", settingsErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
 			complete = false
+			m.recordUnavailable(ctx, server.ID, "configuration", m.schedule.Metadata, snapshot.CollectedAt)
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
@@ -302,6 +323,48 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	status, lastError := collectionOutcome(complete)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, status, snapshot.Version, lastError, true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func (m *Manager) recordFresh(ctx context.Context, serverID, resource string, interval time.Duration, at time.Time) {
+	if err := m.store.RecordCollectionResource(ctx, serverID, resource, "fresh", interval, at, ""); err != nil {
+		m.log.Warn("record resource freshness", "server_id", serverID, "resource", resource, "error", err)
+	}
+}
+
+func (m *Manager) recordUnavailable(ctx context.Context, serverID, resource string, interval time.Duration, at time.Time) {
+	if err := m.store.RecordCollectionResource(ctx, serverID, resource, "unavailable", interval, at, "Collection failed; the last successful evidence is preserved."); err != nil {
+		m.log.Warn("record resource freshness", "server_id", serverID, "resource", resource, "error", err)
+	}
+}
+
+func (m *Manager) recordPartial(ctx context.Context, serverID, resource string, interval time.Duration, at time.Time) {
+	if err := m.store.RecordCollectionResource(ctx, serverID, resource, "partial", interval, at, "Some databases could not be collected; cached evidence is preserved."); err != nil {
+		m.log.Warn("record resource freshness", "server_id", serverID, "resource", resource, "error", err)
+	}
+}
+
+func (m *Manager) recordCycleUnavailable(ctx context.Context, serverID string, cycle collectionCycle) {
+	now := time.Now().UTC()
+	if cycle&(cycleFast|cycleStandard) != 0 {
+		m.recordUnavailable(ctx, serverID, "connections", m.schedule.Fast, now)
+		m.recordUnavailable(ctx, serverID, "database-statistics", m.schedule.Fast, now)
+	}
+	if cycle&cycleFast != 0 {
+		m.recordUnavailable(ctx, serverID, "locks", m.schedule.Fast, now)
+	}
+	if cycle&cycleStandard != 0 {
+		for _, resource := range []string{"queries", "replication", "wal"} {
+			m.recordUnavailable(ctx, serverID, resource, m.schedule.Standard, now)
+		}
+	}
+	if cycle&cycleSlow != 0 {
+		for _, resource := range []string{"tables", "indexes", "vacuum"} {
+			m.recordUnavailable(ctx, serverID, resource, m.schedule.Slow, now)
+		}
+	}
+	if cycle&cycleMetadata != 0 {
+		m.recordUnavailable(ctx, serverID, "configuration", m.schedule.Metadata, now)
+	}
 }
 
 func collectionOutcome(complete bool) (string, string) {

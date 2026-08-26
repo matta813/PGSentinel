@@ -525,6 +525,38 @@ func TestMetricHistoryValidation(t *testing.T) {
 	}
 }
 
+func TestServerFreshnessReturnsFixedSafeResourceSet(t *testing.T) {
+	h := testAPI(t)
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/servers", strings.NewReader(`{"name":"prod","host":"db","user":"monitor","password":"secret"}`)))
+	if r.Code != http.StatusCreated {
+		t.Fatalf("create=%d %s", r.Code, r.Body.String())
+	}
+	var server map[string]any
+	if err := json.Unmarshal(r.Body.Bytes(), &server); err != nil {
+		t.Fatal(err)
+	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/servers/"+server["id"].(string)+"/freshness", nil))
+	if r.Code != http.StatusOK {
+		t.Fatalf("freshness=%d %s", r.Code, r.Body.String())
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(r.Body.Bytes(), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 10 || items[0]["state"] != "unavailable" || strings.Contains(r.Body.String(), "secret") {
+		t.Fatalf("items=%#v", items)
+	}
+	for _, path := range []string{"/api/v1/servers/not-a-uuid/freshness", "/api/v1/servers/1b5c3f33-bfcb-4fd4-9c36-df76e2683ee5/freshness"} {
+		r = httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, path, nil))
+		if r.Code != http.StatusBadRequest && r.Code != http.StatusNotFound {
+			t.Fatalf("%s=%d %s", path, r.Code, r.Body.String())
+		}
+	}
+}
+
 func TestNotificationDestinationAPIKeepsSecretsPrivate(t *testing.T) {
 	h := testAPI(t)
 	body := `{"name":"Operations","provider":"ntfy","enabled":true,"serverUrl":"https://ntfy.sh","topic":"ops","token":"top-secret"}`

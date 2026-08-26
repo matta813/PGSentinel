@@ -101,7 +101,7 @@ flowchart LR
     SQLite --> Outputs
 ```
 
-The Go service schedules read-only collection through `pgx`, persists snapshots and finding state in SQLite, runs deterministic analyzer rules, serves the React application, and exposes versioned operational APIs. See the [architecture guide](docs/architecture.md) for the exact data flow and security boundaries.
+The Go service schedules read-only collection through `pgx`, persists snapshots and finding state in SQLite, runs deterministic analyzer rules, serves the React application, and exposes versioned operational APIs. Every monitoring view labels its evidence as fresh, stale, partial, or unavailable so cached data cannot be mistaken for a current observation. See the [architecture guide](docs/architecture.md) for the exact data flow and security boundaries.
 
 ## Product tour
 
