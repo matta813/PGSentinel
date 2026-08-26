@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Database, Info } from "lucide-react";
 import { useParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, APIError } from "../api/client";
 import { Empty, ErrorState, Loading } from "../components/Status";
 import { PageHeader } from "../components/UI";
 import { useApi } from "../hooks/useApi";
@@ -67,7 +67,10 @@ export function ResourcePage() {
   const freshness = useApi(
     () =>
       selected
-        ? api.get<CollectionResourceStatus[]>(`/servers/${selected}/freshness`)
+        ? api.get<CollectionResourceStatus[]>(`/servers/${selected}/freshness`).catch((error: unknown) => {
+            if (error instanceof APIError && error.status === 404) return [];
+            throw error;
+          })
         : Promise.resolve([]),
     [selected, resource],
   );
