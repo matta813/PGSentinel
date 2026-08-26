@@ -49,7 +49,7 @@ try {
         mustChangePassword: false,
       };
     else if (pathname === "/api/v1/version")
-      body = { version: "0.6.0", commit: "demo" };
+      body = { version: "0.7.0", commit: "demo" };
     else if (pathname === "/api/v1/servers")
       body = [
         {

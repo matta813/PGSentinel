@@ -18,7 +18,7 @@ try {
     const pathname = new URL(intercepted.request().url()).pathname
     const bodies = {
       '/api/v1/auth/session': { authenticated: true, username: 'admin', role: 'administrator', mustChangePassword: false },
-      '/api/v1/version': { version: '0.6.0', commit: 'demo' },
+      '/api/v1/version': { version: '0.7.0', commit: 'demo' },
       '/api/v1/notifications': [{ id: 'pager', provider: 'webhook', name: 'Pager webhook', enabled: true, createdAt: now, updatedAt: now }, { id: 'dba', provider: 'ntfy', name: 'DBA operations', enabled: true, createdAt: now, updatedAt: now }],
       '/api/v1/notification-routes': [{ id: 'route', name: 'Critical production findings', enabled: true, priority: 10, severities: ['CRITICAL'], categories: [], serverIds: [], serverTags: ['production'], transitions: ['new', 'severity_increased', 'reopened'], destinationIds: ['pager', 'dba'], cooldownSeconds: 300, createdAt: now, updatedAt: now }],
       '/api/v1/notification-deliveries': [{ eventId: 'event', destinationId: 'pager', destinationName: 'Pager webhook', eventType: 'severity_increased', findingId: 'finding', findingTitle: 'Replica replay lag is increasing', serverId: 'primary', serverName: 'Production primary', severity: 'CRITICAL', category: 'Replication', status: 'delivered', attempts: 1, createdAt: now, deliveredAt: now }],

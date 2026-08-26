@@ -26,7 +26,7 @@ try {
     const url = new URL(route.request().url())
     let body
     if (url.pathname === '/api/v1/auth/session') body = { authenticated: true, username: 'admin', role: 'administrator', mustChangePassword: false }
-    else if (url.pathname === '/api/v1/version') body = { version: '0.6.0', commit: 'demo' }
+    else if (url.pathname === '/api/v1/version') body = { version: '0.7.0', commit: 'demo' }
     else if (url.pathname === '/api/v1/servers') body = [{ id: 'primary', name: 'Production primary', status: 'healthy', tags: ['production'] }]
     else if (url.pathname === '/api/v1/incidents') body = [incident]
     else if (url.pathname === `/api/v1/incidents/${id}`) body = { ...incident, findings, timeline }

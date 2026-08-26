@@ -7,11 +7,11 @@
 Create a release by changing the value and pushing the commit to `main`:
 
 ```bash
-git switch -c release/0.6.0
-printf '0.6.0\n' > RELEASE
+git switch -c release/0.7.0
+printf '0.7.0\n' > RELEASE
 git add RELEASE docker-compose.yml docker-compose.quickstart.yml .env.example docs/deployment.md
-git commit -m 'chore: release 0.6.0'
-git push -u origin release/0.6.0
+git commit -m 'chore: release 0.7.0'
+git push -u origin release/0.7.0
 gh pr create --base main --fill
 ```
 
@@ -53,7 +53,7 @@ The output includes install and upgrade guidance, short social copy, a project D
 
 ## Image tags
 
-Stable `0.6.0` produces `ghcr.io/matta813/pgsentinel:0.6.0`, `:v0.6.0`, and `:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
+Stable `0.7.0` produces `ghcr.io/matta813/pgsentinel:0.7.0`, `:v0.7.0`, and `:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
 
 Build arguments embed version, commit SHA and UTC build time. They are visible at `GET /api/v1/version` and in the sidebar. Local builds remain `dev`, `unknown`, `unknown`.
 

@@ -17,7 +17,7 @@ try {
     const pathname = new URL(route.request().url()).pathname
     let body
     if (pathname === '/api/v1/auth/session') body = { authenticated: true, username: 'admin', mustChangePassword: false }
-    else if (pathname === '/api/v1/version') body = { version: '0.6.0', commit: 'demo' }
+    else if (pathname === '/api/v1/version') body = { version: '0.7.0', commit: 'demo' }
     else if (pathname === '/api/v1/servers') body = [{ id: 'primary', name: 'Production primary', status: 'degraded', tags: ['production'] }]
     else if (pathname === '/api/v1/servers/primary/queries') body = [{ QueryID: '81273', Database: 'payments', Query: 'SELECT status, count(*) FROM payment_events WHERE created_at > $1 GROUP BY status', Calls: 18420, MeanExecMS: 42.8, TotalExecMS: 788376, ImpactScore: 86.4 }]
     else if (pathname === '/api/v1/servers/primary/freshness') body = [{ serverId: 'primary', resource: 'queries', state: 'unavailable', lastSuccessfulCollection: '2026-08-25T10:14:00Z', ageSeconds: 742, expectedIntervalSeconds: 30, consecutiveFailures: 3, errorSummary: 'Collection failed; the last successful evidence is preserved.' }]

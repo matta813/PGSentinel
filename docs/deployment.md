@@ -24,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/in
 Inspect the [Quickstart Compose file](https://raw.githubusercontent.com/matta813/PGSentinel/main/docker-compose.quickstart.yml) and [installer](https://raw.githubusercontent.com/matta813/PGSentinel/main/scripts/install-compose.sh) before execution when required by local supply-chain policy. The repository Compose file remains available for manually managed deployments and allows an explicit version override:
 
 ```bash
-export PGSENTINEL_VERSION=0.6.0
+export PGSENTINEL_VERSION=0.7.0
 export PGSENTINEL_ENCRYPTION_KEY='value-from-your-secret-store'
 export PGSENTINEL_ADMIN_PASSWORD='value-from-your-secret-store'
 docker compose pull
@@ -50,7 +50,7 @@ Production deployments should use an immutable release version instead of `lates
 4. Verify readiness and the version endpoint.
 
 ```bash
-export PGSENTINEL_VERSION=0.6.0
+export PGSENTINEL_VERSION=0.7.0
 docker compose pull
 docker compose up -d
 curl --fail http://127.0.0.1:8080/ready
