@@ -1,6 +1,6 @@
 services:
   pgsentinel:
-    image: ghcr.io/matta813/pgsentinel:0.6.0
+    image: ghcr.io/matta813/pgsentinel:0.7.0
     container_name: pgsentinel
     restart: unless-stopped
     read_only: true

@@ -22,7 +22,7 @@ try {
     const pathname = new URL(route.request().url()).pathname
     let body
     if (pathname === '/api/v1/auth/session') body = { authenticated: true, username: 'admin', role: 'administrator', mustChangePassword: false }
-    else if (pathname === '/api/v1/version') body = { version: '0.6.0', commit: 'demo' }
+    else if (pathname === '/api/v1/version') body = { version: '0.7.0', commit: 'demo' }
     else if (pathname === '/api/v1/users') body = users
     await route.fulfill({ status: body ? 200 : 404, contentType: 'application/json', body: JSON.stringify(body ?? { error: 'Not found' }) })
   })
