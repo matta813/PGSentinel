@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestUserPasswordLifecycle(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	ctx := context.Background()
-	user := models.User{ID: "user-1", Username: "admin", PasswordHash: []byte("initial-hash"), PasswordSalt: []byte("initial-salt"), MustChangePassword: true}
+	user := models.User{ID: "user-1", Username: "admin", Role: "administrator", PasswordHash: []byte("initial-hash"), PasswordSalt: []byte("initial-salt"), MustChangePassword: true}
 	if err := store.CreateUser(ctx, &user); err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +48,8 @@ func TestUserStorageRejectsDuplicateUsername(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	ctx := context.Background()
-	first := models.User{ID: "user-1", Username: "admin", PasswordHash: []byte("hash"), PasswordSalt: []byte("salt"), MustChangePassword: true}
-	second := models.User{ID: "user-2", Username: "ADMIN", PasswordHash: []byte("hash"), PasswordSalt: []byte("salt"), MustChangePassword: true}
+	first := models.User{ID: "user-1", Username: "admin", Role: "administrator", PasswordHash: []byte("hash"), PasswordSalt: []byte("salt"), MustChangePassword: true}
+	second := models.User{ID: "user-2", Username: "ADMIN", Role: "viewer", PasswordHash: []byte("hash"), PasswordSalt: []byte("salt"), MustChangePassword: true}
 	if err := store.CreateUser(ctx, &first); err != nil {
 		t.Fatal(err)
 	}
@@ -57,5 +58,23 @@ func TestUserStorageRejectsDuplicateUsername(t *testing.T) {
 	}
 	if _, err := store.GetUserByUsername(ctx, "missing"); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("missing user error=%v", err)
+	}
+}
+
+func TestUserStorageIsBounded(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "bounded-users.db"), "a sufficiently long user storage key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	for i := 0; i < 100; i++ {
+		user := models.User{ID: fmt.Sprintf("user-%d", i), Username: fmt.Sprintf("user-%d", i), Role: "viewer", PasswordHash: []byte("hash"), PasswordSalt: []byte("salt"), MustChangePassword: true}
+		if err := store.CreateUser(context.Background(), &user); err != nil {
+			t.Fatalf("create user %d: %v", i, err)
+		}
+	}
+	extra := models.User{ID: "extra", Username: "extra", Role: "viewer", PasswordHash: []byte("hash"), PasswordSalt: []byte("salt"), MustChangePassword: true}
+	if err := store.CreateUser(context.Background(), &extra); err == nil {
+		t.Fatal("101st local user was accepted")
 	}
 }
