@@ -18,6 +18,28 @@ import (
 	"time"
 )
 
+func TestRolePermissionBoundaries(t *testing.T) {
+	cases := []struct {
+		role, method, path string
+		want               bool
+	}{
+		{"administrator", http.MethodDelete, "/api/v1/servers/id", true},
+		{"operator", http.MethodGet, "/api/v1/servers", true},
+		{"operator", http.MethodPut, "/api/v1/problems/abc/status", true},
+		{"operator", http.MethodPost, "/api/v1/servers", false},
+		{"operator", http.MethodGet, "/api/v1/audit-events", false},
+		{"viewer", http.MethodGet, "/api/v1/incidents", true},
+		{"viewer", http.MethodPut, "/api/v1/problems/abc/status", false},
+		{"viewer", http.MethodGet, "/api/v1/users", false},
+		{"viewer", http.MethodPut, "/api/v1/auth/password", true},
+	}
+	for _, tc := range cases {
+		if got := allowed(tc.role, tc.method, tc.path); got != tc.want {
+			t.Errorf("allowed(%q,%q,%q)=%v want %v", tc.role, tc.method, tc.path, got, tc.want)
+		}
+	}
+}
+
 func testAPI(t *testing.T) http.Handler {
 	t.Helper()
 	s, err := storage.Open(filepath.Join(t.TempDir(), "api.db"), "a sufficiently long api test key")
@@ -119,6 +141,16 @@ func TestOperatorControlsAPIValidationAndLifecycle(t *testing.T) {
 			t.Fatalf("%s=%d %s", path, r.Code, r.Body.String())
 		}
 	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/users", strings.NewReader(`{"username":"readonly","password":"temporary-secret-password","role":"viewer"}`)))
+	if r.Code != http.StatusCreated || strings.Contains(r.Body.String(), "temporary-secret-password") || strings.Contains(r.Body.String(), "passwordHash") {
+		t.Fatalf("create user=%d %s", r.Code, r.Body.String())
+	}
+	r = httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/users", nil))
+	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"role":"viewer"`) || strings.Contains(r.Body.String(), "passwordHash") {
+		t.Fatalf("list users=%d %s", r.Code, r.Body.String())
+	}
 }
 
 func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
@@ -167,6 +199,32 @@ func TestAuthenticationRequiredAndLoginLifecycle(t *testing.T) {
 	handler.ServeHTTP(r, change)
 	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"mustChangePassword":false`) {
 		t.Fatalf("password change=%d %s", r.Code, r.Body.String())
+	}
+	viewer, err := manager.CreateUser(context.Background(), "viewer", "viewer-initial-password", "viewer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewerResponse := httptest.NewRecorder()
+	if err := manager.Start(viewerResponse, viewer); err != nil {
+		t.Fatal(err)
+	}
+	viewerCookie := viewerResponse.Result().Cookies()[0]
+	viewerChange := httptest.NewRequest(http.MethodPut, "/api/v1/auth/password", nil)
+	viewerChange.AddCookie(viewerCookie)
+	if err := manager.ChangePassword(context.Background(), viewerChange, "viewer-initial-password", "viewer-replacement-password"); err != nil {
+		t.Fatal(err)
+	}
+	for _, boundary := range []struct {
+		method, path string
+		want         int
+	}{{http.MethodGet, "/api/v1/servers", http.StatusOK}, {http.MethodPost, "/api/v1/servers", http.StatusForbidden}, {http.MethodPut, "/api/v1/problems/0123456789abcdef01234567/status", http.StatusForbidden}, {http.MethodGet, "/api/v1/users", http.StatusForbidden}, {http.MethodGet, "/api/v1/audit-events", http.StatusForbidden}} {
+		request := httptest.NewRequest(boundary.method, boundary.path, strings.NewReader(`{}`))
+		request.AddCookie(viewerCookie)
+		r = httptest.NewRecorder()
+		handler.ServeHTTP(r, request)
+		if r.Code != boundary.want {
+			t.Errorf("viewer %s %s=%d want %d: %s", boundary.method, boundary.path, r.Code, boundary.want, r.Body.String())
+		}
 	}
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
 	req.AddCookie(cookie)

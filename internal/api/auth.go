@@ -37,8 +37,28 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 			failure(w, http.StatusForbidden, "Password change required", nil)
 			return
 		}
+		if !allowed(session.Role, r.Method, r.URL.Path) {
+			failure(w, http.StatusForbidden, "Insufficient role", nil)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func allowed(role, method, path string) bool {
+	if role == "administrator" {
+		return true
+	}
+	if strings.HasPrefix(path, "/api/v1/users") || strings.HasPrefix(path, "/api/v1/audit-events") {
+		return false
+	}
+	if path == "/api/v1/auth/session" || path == "/api/v1/auth/logout" || path == "/api/v1/auth/password" {
+		return true
+	}
+	if method == http.MethodGet {
+		return role == "operator" || role == "viewer"
+	}
+	return role == "operator" && method == http.MethodPut && strings.HasPrefix(path, "/api/v1/problems/") && strings.HasSuffix(path, "/status")
 }
 
 func (a *API) login(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +88,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.audit(r, user.Username, "auth.login.succeeded", "user", user.ID, "A user signed in.")
-	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": user.Username, "mustChangePassword": user.MustChangePassword})
+	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": user.Username, "role": user.Role, "mustChangePassword": user.MustChangePassword})
 }
 
 func (a *API) session(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +97,7 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 		failure(w, http.StatusUnauthorized, "Authentication required", nil)
 		return
 	}
-	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": session.Username, "mustChangePassword": session.MustChangePassword})
+	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": session.Username, "role": session.Role, "mustChangePassword": session.MustChangePassword})
 }
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
@@ -109,5 +129,5 @@ func (a *API) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	session, _ := a.auth.Session(r)
 	a.audit(r, session.Username, "auth.password.changed", "user", session.UserID, "A user changed their password; other sessions were invalidated.")
-	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": session.Username, "mustChangePassword": false})
+	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": session.Username, "role": session.Role, "mustChangePassword": false})
 }
