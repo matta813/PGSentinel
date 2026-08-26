@@ -11,6 +11,15 @@ type User struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
+type AuditEvent struct {
+	ID           string    `json:"id"`
+	OccurredAt   time.Time `json:"occurredAt"`
+	Actor        string    `json:"actor"`
+	Action       string    `json:"action"`
+	ResourceType string    `json:"resourceType"`
+	ResourceID   string    `json:"resourceId,omitempty"`
+	Summary      string    `json:"summary"`
+}
 
 type Severity string
 
@@ -55,36 +64,6 @@ type Suggestion struct {
 	Title  string `json:"title"`
 	Detail string `json:"detail,omitempty"`
 }
-type Finding struct {
-	ID              string                    `json:"id"`
-	RuleID          string                    `json:"ruleId"`
-	Fingerprint     string                    `json:"fingerprint"`
-	ServerID        string                    `json:"serverId"`
-	Database        string                    `json:"database,omitempty"`
-	Resource        string                    `json:"resource,omitempty"`
-	Severity        Severity                  `json:"severity"`
-	Category        string                    `json:"category"`
-	Title           string                    `json:"title"`
-	Summary         string                    `json:"summary"`
-	Cause           string                    `json:"cause"`
-	Impact          string                    `json:"impact"`
-	Evidence        []Evidence                `json:"evidence"`
-	Suggestions     []Suggestion              `json:"suggestions"`
-	Confidence      Confidence                `json:"confidence"`
-	Status          string                    `json:"status"`
-	StartedAt       time.Time                 `json:"startedAt"`
-	UpdatedAt       time.Time                 `json:"updatedAt"`
-	ResolvedAt      *time.Time                `json:"resolvedAt,omitempty"`
-	EvidenceQuality *CollectionResourceStatus `json:"evidenceQuality,omitempty"`
-}
-type Metric struct {
-	ServerID    string            `json:"serverId"`
-	Database    string            `json:"database,omitempty"`
-	Name        string            `json:"name"`
-	Value       float64           `json:"value"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	CollectedAt time.Time         `json:"collectedAt"`
-}
 type CollectionResourceStatus struct {
 	ServerID                string     `json:"serverId"`
 	Resource                string     `json:"resource"`
@@ -96,6 +75,100 @@ type CollectionResourceStatus struct {
 	ExpectedIntervalSeconds int64      `json:"expectedIntervalSeconds"`
 	ConsecutiveFailures     int        `json:"consecutiveFailures"`
 	ErrorSummary            string     `json:"errorSummary,omitempty"`
+}
+type Finding struct {
+	ID                string                    `json:"id"`
+	RuleID            string                    `json:"ruleId"`
+	Fingerprint       string                    `json:"fingerprint"`
+	ServerID          string                    `json:"serverId"`
+	Database          string                    `json:"database,omitempty"`
+	Resource          string                    `json:"resource,omitempty"`
+	Severity          Severity                  `json:"severity"`
+	Category          string                    `json:"category"`
+	Title             string                    `json:"title"`
+	Summary           string                    `json:"summary"`
+	Cause             string                    `json:"cause"`
+	Impact            string                    `json:"impact"`
+	Evidence          []Evidence                `json:"evidence"`
+	Suggestions       []Suggestion              `json:"suggestions"`
+	Confidence        Confidence                `json:"confidence"`
+	Status            string                    `json:"status"`
+	StartedAt         time.Time                 `json:"startedAt"`
+	UpdatedAt         time.Time                 `json:"updatedAt"`
+	ResolvedAt        *time.Time                `json:"resolvedAt,omitempty"`
+	Suppressed        bool                      `json:"suppressed"`
+	SuppressionReason string                    `json:"suppressionReason,omitempty"`
+	Maintenance       bool                      `json:"maintenance"`
+	EvidenceQuality   *CollectionResourceStatus `json:"evidenceQuality,omitempty"`
+}
+type Incident struct {
+	ID         string          `json:"id"`
+	ServerID   string          `json:"serverId"`
+	Title      string          `json:"title"`
+	Summary    string          `json:"summary"`
+	Rationale  []string        `json:"rationale"`
+	Severity   Severity        `json:"severity"`
+	Status     string          `json:"status"`
+	StartedAt  time.Time       `json:"startedAt"`
+	UpdatedAt  time.Time       `json:"updatedAt"`
+	ResolvedAt *time.Time      `json:"resolvedAt,omitempty"`
+	Findings   []Finding       `json:"findings,omitempty"`
+	Timeline   []IncidentEvent `json:"timeline,omitempty"`
+}
+type IncidentEvent struct {
+	At        time.Time `json:"at"`
+	Type      string    `json:"type"`
+	FindingID string    `json:"findingId"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	Severity  Severity  `json:"severity"`
+}
+type MaintenanceWindow struct {
+	ID          string    `json:"id"`
+	Description string    `json:"description"`
+	ServerID    string    `json:"serverId,omitempty"`
+	ServerTag   string    `json:"serverTag,omitempty"`
+	Category    string    `json:"category,omitempty"`
+	RuleID      string    `json:"ruleId,omitempty"`
+	StartsAt    time.Time `json:"startsAt"`
+	EndsAt      time.Time `json:"endsAt"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	State       string    `json:"state"`
+}
+type FindingSuppression struct {
+	ID        string    `json:"id"`
+	FindingID string    `json:"findingId,omitempty"`
+	RuleID    string    `json:"ruleId,omitempty"`
+	ServerID  string    `json:"serverId,omitempty"`
+	ServerTag string    `json:"serverTag,omitempty"`
+	Reason    string    `json:"reason"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	State     string    `json:"state"`
+}
+type ThresholdOverride struct {
+	ID         string    `json:"id"`
+	RuleID     string    `json:"ruleId"`
+	ScopeType  string    `json:"scopeType"`
+	ScopeValue string    `json:"scopeValue"`
+	Reason     string    `json:"reason"`
+	Value      float64   `json:"value"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+}
+type Metric struct {
+	ServerID    string            `json:"serverId"`
+	Database    string            `json:"database,omitempty"`
+	Name        string            `json:"name"`
+	Value       float64           `json:"value"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	CollectedAt time.Time         `json:"collectedAt"`
+	Minimum     *float64          `json:"minimum,omitempty"`
+	Maximum     *float64          `json:"maximum,omitempty"`
+	Samples     int               `json:"samples,omitempty"`
+	Resolution  string            `json:"resolution,omitempty"`
 }
 type NotificationDestination struct {
 	ID        string            `json:"id"`
@@ -160,17 +233,28 @@ type Snapshot struct {
 	Capabilities  map[string]bool   `json:"capabilities"`
 	Replication   ReplicationStats  `json:"replication"`
 	WAL           WALStats          `json:"wal"`
+	ServerTags    []string          `json:"serverTags,omitempty"`
 }
 
 type ReplicationStats struct {
-	InRecovery bool                 `json:"inRecovery"`
-	Standbys   []ReplicationStandby `json:"standbys"`
-	Receiver   *WALReceiver         `json:"receiver,omitempty"`
-	Slots      []ReplicationSlot    `json:"slots"`
+	InRecovery         bool                 `json:"inRecovery"`
+	TimelineID         int                  `json:"timelineId"`
+	RecoveryPaused     bool                 `json:"recoveryPaused"`
+	ReplayDelaySeconds float64              `json:"replayDelaySeconds"`
+	ReplayLSN          string               `json:"replayLsn,omitempty"`
+	ReceiveLSN         string               `json:"receiveLsn,omitempty"`
+	CollectedAt        time.Time            `json:"collectedAt"`
+	Standbys           []ReplicationStandby `json:"standbys"`
+	Receiver           *WALReceiver         `json:"receiver,omitempty"`
+	Slots              []ReplicationSlot    `json:"slots"`
 }
 type ReplicationStandby struct {
-	Application, ClientAddress, State, SyncState       string
-	WriteLagSeconds, FlushLagSeconds, ReplayLagSeconds float64
+	Application, ClientAddress, State, SyncState                               string
+	WriteLagSeconds, FlushLagSeconds, ReplayLagSeconds                         float64
+	SentLSN, WriteLSN, FlushLSN, ReplayLSN                                     string
+	PendingSendBytes, PendingWriteBytes, PendingFlushBytes, PendingReplayBytes float64
+	ReplyAgeSeconds                                                            float64
+	PendingReplayGrowthBytesPerSecond                                          float64
 }
 type WALReceiver struct {
 	Status, SenderHost, LatestEndLSN string
@@ -180,10 +264,21 @@ type ReplicationSlot struct {
 	Name, Type, Database, WALStatus string
 	Active                          bool
 	RetainedBytes                   float64
+	InactiveSeconds                 float64
+	RetainedGrowthBytesPerSecond    float64
 }
 type WALStats struct {
 	TimedCheckpoints, RequestedCheckpoints, WriteTimeMS, SyncTimeMS, BuffersWritten float64
 	StatsReset                                                                      *time.Time
+	WALRecords, WALFullPageImages, WALBytes, WALBuffersFull                         float64
+	WALStatsReset                                                                   *time.Time
+	ArchiveMode, CurrentLSN, LastArchivedWAL, LastFailedWAL                         string
+	ArchiveConfigured                                                               bool
+	ArchivedCount, FailedArchiveCount                                               float64
+	LastArchivedAt, LastFailedAt                                                    *time.Time
+	RestartpointsTimed, RestartpointsRequested, RestartpointsDone                   float64
+	CollectedAt                                                                     time.Time
+	GenerationBytesPerSecond, BufferFullEventsPerSecond                             float64
 }
 type ConnectionStats struct {
 	Active, Idle, IdleInTransaction, Waiting, Total, Max                  int

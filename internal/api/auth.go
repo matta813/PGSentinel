@@ -47,6 +47,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !a.auth.AllowAttempt(r) {
+		a.audit(r, "anonymous", "auth.login.rate_limited", "session", "", "A login attempt was rate limited.")
 		failure(w, http.StatusTooManyRequests, "Too many login attempts; try again later", nil)
 		return
 	}
@@ -56,6 +57,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := a.auth.Authenticate(r.Context(), request.Username, request.Password)
 	if err != nil {
+		a.audit(r, "anonymous", "auth.login.failed", "session", "", "A login attempt failed.")
 		failure(w, http.StatusUnauthorized, "Invalid credentials", nil)
 		return
 	}
@@ -65,6 +67,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		failure(w, http.StatusInternalServerError, "Unable to create session", nil)
 		return
 	}
+	a.audit(r, user.Username, "auth.login.succeeded", "user", user.ID, "A user signed in.")
 	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": user.Username, "mustChangePassword": user.MustChangePassword})
 }
 
@@ -78,7 +81,12 @@ func (a *API) session(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
+	actor := "system"
+	if session, ok := a.auth.Session(r); ok {
+		actor = session.Username
+	}
 	a.auth.End(w, r)
+	a.audit(r, actor, "auth.logout", "session", "", "A user signed out.")
 	write(w, http.StatusOK, map[string]bool{"authenticated": false})
 }
 
@@ -100,5 +108,6 @@ func (a *API) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, _ := a.auth.Session(r)
+	a.audit(r, session.Username, "auth.password.changed", "user", session.UserID, "A user changed their password; other sessions were invalidated.")
 	write(w, http.StatusOK, map[string]any{"authenticated": true, "username": session.Username, "mustChangePassword": false})
 }

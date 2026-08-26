@@ -17,8 +17,9 @@ import (
 )
 
 type Schedule struct {
-	Fast, Standard, Slow, Metadata, Retention time.Duration
-	FanoutLimit                               int
+	Fast, Standard, Slow, Metadata, Retention                      time.Duration
+	MetricRawRetention, MetricMediumRetention, MetricLongRetention time.Duration
+	FanoutLimit                                                    int
 }
 
 type collectionCycle uint8
@@ -64,6 +65,15 @@ func (s Schedule) normalized() Schedule {
 	if s.Retention <= 0 {
 		s.Retention = 30 * 24 * time.Hour
 	}
+	if s.MetricRawRetention <= 0 {
+		s.MetricRawRetention = 24 * time.Hour
+	}
+	if s.MetricMediumRetention < s.MetricRawRetention {
+		s.MetricMediumRetention = 30 * 24 * time.Hour
+	}
+	if s.MetricLongRetention < s.MetricMediumRetention {
+		s.MetricLongRetention = 365 * 24 * time.Hour
+	}
 	if s.FanoutLimit <= 0 {
 		s.FanoutLimit = 32
 	}
@@ -105,7 +115,9 @@ func (m *Manager) Run(ctx context.Context) {
 }
 
 func (m *Manager) prune(ctx context.Context, now time.Time) error {
-	return m.store.Prune(ctx, now.Add(-m.schedule.Retention))
+	return m.store.PruneMonitoringHistory(ctx, now, m.schedule.Retention, storage.MetricRetentionPolicy{
+		Raw: m.schedule.MetricRawRetention, Medium: m.schedule.MetricMediumRetention, Long: m.schedule.MetricLongRetention,
+	})
 }
 
 func (m *Manager) collectAll(ctx context.Context, cycle collectionCycle) {
@@ -139,6 +151,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	defer client.Close()
 	collector := NewCore(client.Pool())
 	snapshot := models.Snapshot{ServerID: server.ID, CollectedAt: time.Now().UTC(), Capabilities: map[string]bool{}}
+	snapshot.ServerTags = append([]string(nil), server.Tags...)
 	coreFresh := cycle&(cycleFast|cycleStandard) != 0
 	if coreFresh {
 		snapshot, err = collector.Collect(ctx, server.ID)
@@ -157,6 +170,10 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		return
 	}
 	if cycle&cycleStandard != 0 {
+		var previousReplication models.ReplicationStats
+		var previousWAL models.WALStats
+		_ = m.store.LatestSnapshot(ctx, server.ID, "replication", &previousReplication)
+		_ = m.store.LatestSnapshot(ctx, server.ID, "wal", &previousWAL)
 		replication, replicationErr := collector.CollectReplication(ctx)
 		if replicationErr == nil {
 			snapshot.Replication = replication
@@ -170,6 +187,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		}
 		wal, walErr := collector.CollectWAL(ctx)
 		if walErr == nil {
+			if replicationErr == nil {
+				analyzer.EnrichWritePath(previousWAL, previousReplication, &wal, &snapshot.Replication)
+			}
 			snapshot.WAL = wal
 			_ = m.store.SaveSnapshot(ctx, server.ID, "wal", wal, snapshot.CollectedAt)
 			m.recordFresh(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
@@ -178,6 +198,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			_ = m.restoreSnapshot(ctx, server.ID, "wal", &snapshot.WAL)
 			complete = false
 			m.recordUnavailable(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
+		}
+		if replicationErr == nil {
+			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt)
 		}
 		queries, available, queryErr := collector.CollectQueries(ctx)
 		snapshot.Capabilities["pg_stat_statements"] = available
@@ -259,7 +282,14 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		m.log.Info("metadata collection complete", "server_id", server.ID)
 		return
 	}
-	findings := m.engine.Analyze(snapshot)
+	engine := m.engine
+	if overrides, overrideErr := m.store.EffectiveThresholdOverrides(ctx, server); overrideErr == nil {
+		engine = analyzer.New(analyzer.ApplyThresholdOverrides(analyzer.DefaultThresholds(), overrides))
+	} else {
+		complete = false
+		m.log.Warn("resolve analyzer thresholds", "server_id", server.ID, "error", overrideErr)
+	}
+	findings := engine.Analyze(snapshot)
 	findings = append(findings, regressionFindings...)
 	findings = append(findings, analyzer.IndexFindings(server.ID, snapshot.Indexes)...)
 	if err := m.reconcileFindings(ctx, server.ID, findings, complete); err != nil {
@@ -384,7 +414,10 @@ func (m *Manager) reconcileFindings(ctx context.Context, serverID string, findin
 	if !complete {
 		return nil
 	}
-	return m.store.UpsertFindings(ctx, serverID, findings)
+	if err := m.store.UpsertFindings(ctx, serverID, findings); err != nil {
+		return err
+	}
+	return m.store.RebuildIncidents(ctx, serverID, time.Now().UTC())
 }
 
 func (m *Manager) restoreSnapshot(ctx context.Context, serverID, kind string, value any) bool {
@@ -414,12 +447,29 @@ func restoreCapabilities(ctx context.Context, store *storage.Store, serverID str
 }
 
 func snapshotMetrics(s models.Snapshot) []models.Metric {
+	maxReplayLag, maxReplayBytes, retainedSlotBytes := 0.0, 0.0, 0.0
+	for _, standby := range s.Replication.Standbys {
+		if standby.ReplayLagSeconds > maxReplayLag {
+			maxReplayLag = standby.ReplayLagSeconds
+		}
+		if standby.PendingReplayBytes > maxReplayBytes {
+			maxReplayBytes = standby.PendingReplayBytes
+		}
+	}
+	for _, slot := range s.Replication.Slots {
+		retainedSlotBytes += slot.RetainedBytes
+	}
 	values := map[string]float64{
-		"connections.active":      float64(s.Connections.Active),
-		"connections.total":       float64(s.Connections.Total),
-		"connections.utilization": s.Connections.Utilization,
-		"connections.waiting":     float64(s.Connections.Waiting),
-		"server.uptime_seconds":   s.UptimeSeconds,
+		"connections.active":                   float64(s.Connections.Active),
+		"connections.total":                    float64(s.Connections.Total),
+		"connections.utilization":              s.Connections.Utilization,
+		"connections.waiting":                  float64(s.Connections.Waiting),
+		"server.uptime_seconds":                s.UptimeSeconds,
+		"wal.generation_bytes_per_second":      s.WAL.GenerationBytesPerSecond,
+		"wal.bytes_total":                      s.WAL.WALBytes,
+		"replication.max_replay_lag_seconds":   maxReplayLag,
+		"replication.max_pending_replay_bytes": maxReplayBytes,
+		"replication.slot_retained_bytes":      retainedSlotBytes,
 	}
 	out := make([]models.Metric, 0, len(values))
 	for name, value := range values {

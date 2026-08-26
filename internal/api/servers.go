@@ -68,6 +68,7 @@ func (a *API) createServer(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "Unable to save PostgreSQL server", err)
 		return
 	}
+	a.audit(r, "", "server.created", "server", v.ID, "A PostgreSQL target was added.")
 	v.Password = ""
 	write(w, 201, v)
 }
@@ -131,12 +132,17 @@ func (a *API) updateServer(w http.ResponseWriter, r *http.Request) {
 		failure(w, 422, "Unsupported SSL mode", nil)
 		return
 	}
+	credentialsRotated := v.Password != ""
 	if err := a.store.UpdateServer(r.Context(), &v); err == sql.ErrNoRows {
 		failure(w, 404, "Server not found", nil)
 		return
 	} else if err != nil {
 		failure(w, 409, "Unable to update PostgreSQL server", err)
 		return
+	}
+	a.audit(r, "", "server.updated", "server", id, "A PostgreSQL target was edited.")
+	if credentialsRotated {
+		a.audit(r, "", "server.credentials_rotated", "server", id, "PostgreSQL target credentials were rotated.")
 	}
 	updated, err := a.store.GetServer(r.Context(), id, false)
 	if err != nil {
@@ -172,6 +178,7 @@ func (a *API) deleteServer(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to delete server", err)
 		return
 	}
+	a.audit(r, "", "server.deleted", "server", id, "A PostgreSQL target was removed.")
 	w.WriteHeader(204)
 }
 func (a *API) testServer(w http.ResponseWriter, r *http.Request) {

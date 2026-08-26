@@ -16,6 +16,8 @@ var historicalMetrics = map[string]bool{
 	"connections.waiting": true, "server.uptime_seconds": true,
 }
 
+var monitoredResources = []string{"connections", "locks", "database-statistics", "queries", "tables", "indexes", "vacuum", "replication", "wal", "configuration"}
+
 func (a *API) metricHistory(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !validID(id) {
@@ -81,6 +83,10 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to load problems", err)
 		return
 	}
+	if err := a.store.ApplyOperatorControls(r.Context(), items, time.Now().UTC()); err != nil {
+		failure(w, 500, "Unable to apply operator controls", err)
+		return
+	}
 	a.attachFindingQuality(r, items)
 	write(w, 200, items)
 }
@@ -107,6 +113,11 @@ func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to update problem", err)
 		return
 	}
+	if request.Status == "acknowledged" {
+		a.audit(r, "", "finding.acknowledged", "finding", id, "A finding was acknowledged; its evidence and health impact remain available.")
+	} else {
+		a.audit(r, "", "finding.reopened", "finding", id, "An acknowledged finding was returned to active triage.")
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 func (a *API) overview(w http.ResponseWriter, r *http.Request) {
@@ -120,13 +131,16 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to load overview", err)
 		return
 	}
+	if err := a.store.ApplyOperatorControls(r.Context(), findings, time.Now().UTC()); err != nil {
+		failure(w, 500, "Unable to apply operator controls", err)
+		return
+	}
 	a.attachFindingQuality(r, findings)
 	counts := map[models.Severity]int{}
 	for _, f := range findings {
 		counts[f.Severity]++
 	}
 	score := analyzer.HealthScore(findings)
-	freshness := map[string][]models.CollectionResourceStatus{}
 	for _, server := range servers {
 		switch server.Status {
 		case "unreachable", "error":
@@ -138,24 +152,9 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 				score.Overall = 75
 			}
 		}
-		quality, qualityErr := a.store.ListCollectionResources(r.Context(), server.ID, time.Now())
-		if qualityErr == nil {
-			freshness[server.ID] = quality
-			for _, item := range quality {
-				if (item.State == "partial" || item.State == "stale") && score.Overall > 75 {
-					score.Overall = 75
-				}
-				if item.State == "unavailable" && score.Overall > 60 {
-					score.Overall = 60
-				}
-			}
-		}
 	}
-	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score, "freshness": freshness})
+	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score})
 }
-
-var monitoredResources = []string{"connections", "locks", "database-statistics", "queries", "tables", "indexes", "vacuum", "replication", "wal", "configuration"}
-
 func (a *API) serverFreshness(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !validID(id) {
@@ -233,6 +232,7 @@ func qualityForFinding(finding models.Finding, items []models.CollectionResource
 	}
 	return nil
 }
+
 func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 	id, resource := r.PathValue("id"), r.PathValue("resource")
 	allowed := map[string]string{"metrics": "core", "databases": "core", "connections": "core", "queries": "queries", "tables": "tables", "indexes": "indexes", "locks": "locks", "configuration": "configuration", "vacuum": "tables", "replication": "replication", "wal": "wal"}

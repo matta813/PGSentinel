@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestLoadRequiresEncryptionKey(t *testing.T) {
 	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
@@ -24,6 +27,36 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if c.FanoutDatabaseLimit != 32 {
 		t.Fatalf("default fanout database limit = %d, want 32", c.FanoutDatabaseLimit)
+	}
+	if c.MetricRawRetention != 24*time.Hour || c.MetricMediumRetention != 30*24*time.Hour || c.MetricLongRetention != 365*24*time.Hour {
+		t.Fatalf("unexpected metric retention defaults: %+v", c)
+	}
+}
+
+func TestLoadValidatesMetricRetentionTiers(t *testing.T) {
+	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
+	t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "test-encryption-key-32-chars-min")
+	t.Setenv("PGSENTINEL_ADMIN_PASSWORD", "a-secure-test-password")
+	t.Setenv("PGSENTINEL_METRIC_RAW_RETENTION", "48h")
+	t.Setenv("PGSENTINEL_METRIC_MEDIUM_RETENTION", "24h")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected descending metric retention tiers to be rejected")
+	}
+	t.Setenv("PGSENTINEL_METRIC_MEDIUM_RETENTION", "720h")
+	t.Setenv("PGSENTINEL_METRIC_LONG_RETENTION", "8760h")
+	c, err := Load()
+	if err != nil || c.MetricRawRetention != 48*time.Hour {
+		t.Fatalf("valid metric retention rejected: %+v, %v", c, err)
+	}
+}
+
+func TestLoadRejectsInvalidMetricRetentionDuration(t *testing.T) {
+	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
+	t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "test-encryption-key-32-chars-min")
+	t.Setenv("PGSENTINEL_ADMIN_PASSWORD", "a-secure-test-password")
+	t.Setenv("PGSENTINEL_METRIC_RAW_RETENTION", "forever")
+	if _, err := Load(); err == nil {
+		t.Fatal("invalid metric retention duration was silently accepted")
 	}
 }
 
