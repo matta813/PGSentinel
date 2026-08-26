@@ -15,7 +15,7 @@ export function AppLayout({ username, role, onLogout }: { username: string; role
   const [open, setOpen] = useState(false)
   const [dark, setDark] = useState(() => localStorage.theme !== 'light')
   const { pathname } = useLocation()
-  const { data: build } = useApi(() => api.get<{ version: string; commit: string }>('/version'), [])
+  const { data: build } = useApi(() => api.get<{ version: string; commit: string }>('/version', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }), [])
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.theme = dark ? 'dark' : 'light' }, [dark])
   async function logout() { await api.post('/auth/logout'); onLogout() }
   return <div className="app-shell">
