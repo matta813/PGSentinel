@@ -19,6 +19,7 @@ import (
 type Schedule struct {
 	Fast, Standard, Slow, Metadata, Retention                      time.Duration
 	MetricRawRetention, MetricMediumRetention, MetricLongRetention time.Duration
+	MaxSnapshotsPerResource                                        int
 	FanoutLimit                                                    int
 }
 
@@ -77,12 +78,18 @@ func (s Schedule) normalized() Schedule {
 	if s.FanoutLimit <= 0 {
 		s.FanoutLimit = 32
 	}
+	if s.MaxSnapshotsPerResource < 10 {
+		s.MaxSnapshotsPerResource = 120
+	}
 	return s
 }
 
 func (m *Manager) Run(ctx context.Context) {
 	m.wg.Add(1)
 	defer m.wg.Done()
+	if err := m.prune(ctx, time.Now()); err != nil {
+		m.log.Warn("prune monitoring history at startup", "error", err)
+	}
 	m.collectAll(ctx, cycleAll)
 	fast := time.NewTicker(m.schedule.Fast)
 	standard := time.NewTicker(m.schedule.Standard)
@@ -115,7 +122,7 @@ func (m *Manager) Run(ctx context.Context) {
 }
 
 func (m *Manager) prune(ctx context.Context, now time.Time) error {
-	return m.store.PruneMonitoringHistory(ctx, now, m.schedule.Retention, storage.MetricRetentionPolicy{
+	return m.store.PruneMonitoringHistory(ctx, now, m.schedule.Retention, m.schedule.MaxSnapshotsPerResource, storage.MetricRetentionPolicy{
 		Raw: m.schedule.MetricRawRetention, Medium: m.schedule.MetricMediumRetention, Long: m.schedule.MetricLongRetention,
 	})
 }

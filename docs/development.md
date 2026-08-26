@@ -15,7 +15,7 @@ In another terminal, `make frontend`; Vite proxies API requests to port 8080. `m
 
 The production Dockerfile uses a BuildKit cache mount for npm's download cache. This speeds up repeated image builds without copying `node_modules` or cached packages into the resulting image layers.
 
-`PGSENTINEL_RETENTION` controls raw snapshot retention and is applied by the hourly maintenance task. Metric history has separate bounded raw, medium, and long retention settings described in [Metric retention](metric-retention.md). Findings and server configuration are not removed by either policy.
+`PGSENTINEL_RETENTION` controls raw snapshot retention. `PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE` (default `120`) additionally caps full JSON snapshots independently for every server and resource, preventing large query snapshots from exhausting the host disk before the age cutoff. Cleanup runs at startup and hourly. Metric history has separate bounded raw, medium, and long retention settings described in [Metric retention](metric-retention.md). Findings and server configuration are not removed by either policy.
 
 Add migrations as ordered files under `migrations/`. Rules should be deterministic, return actionable evidence, state uncertainty, and include unit tests at threshold boundaries. Collector queries must be read-only, bounded, version-aware for PostgreSQL 15+, and avoid large unbounded result sets. Never log a server object containing its decrypted password.
 

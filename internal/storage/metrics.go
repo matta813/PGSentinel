@@ -156,9 +156,12 @@ func (p MetricRetentionPolicy) validate() error {
 // PruneMonitoringHistory rolls expiring raw metrics into fixed aggregate tiers
 // before deleting them. The transaction makes cleanup safe to retry: either all
 // aggregate upserts and deletes commit, or the raw samples remain untouched.
-func (s *Store) PruneMonitoringHistory(ctx context.Context, now time.Time, snapshotRetention time.Duration, policy MetricRetentionPolicy) error {
+func (s *Store) PruneMonitoringHistory(ctx context.Context, now time.Time, snapshotRetention time.Duration, maxSnapshotsPerResource int, policy MetricRetentionPolicy) error {
 	if snapshotRetention <= 0 {
 		return fmt.Errorf("snapshot retention must be positive")
+	}
+	if maxSnapshotsPerResource < 10 {
+		return fmt.Errorf("snapshot sample limit must be at least 10")
 	}
 	if err := policy.validate(); err != nil {
 		return err
@@ -194,6 +197,14 @@ func (s *Store) PruneMonitoringHistory(ctx context.Context, now time.Time, snaps
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM snapshots WHERE collected_at < ?`, now.UTC().Add(-snapshotRetention).Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM snapshots WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY server_id,kind ORDER BY collected_at DESC,id DESC) AS sample_number
+			FROM snapshots
+		) WHERE sample_number > ?
+	)`, maxSnapshotsPerResource); err != nil {
 		return err
 	}
 	return tx.Commit()

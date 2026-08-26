@@ -15,11 +15,11 @@ import (
 
 func TestScheduleNormalizesEachCollectorIndependently(t *testing.T) {
 	schedule := (Schedule{Fast: 2 * time.Second, Standard: 15 * time.Second, Slow: 2 * time.Minute, Metadata: time.Hour, Retention: 48 * time.Hour, MetricRawRetention: 6 * time.Hour, MetricMediumRetention: 14 * 24 * time.Hour, MetricLongRetention: 180 * 24 * time.Hour}).normalized()
-	if schedule.Fast != 2*time.Second || schedule.Standard != 15*time.Second || schedule.Slow != 2*time.Minute || schedule.Metadata != time.Hour || schedule.Retention != 48*time.Hour || schedule.MetricRawRetention != 6*time.Hour || schedule.MetricMediumRetention != 14*24*time.Hour || schedule.MetricLongRetention != 180*24*time.Hour {
+	if schedule.Fast != 2*time.Second || schedule.Standard != 15*time.Second || schedule.Slow != 2*time.Minute || schedule.Metadata != time.Hour || schedule.Retention != 48*time.Hour || schedule.MetricRawRetention != 6*time.Hour || schedule.MetricMediumRetention != 14*24*time.Hour || schedule.MetricLongRetention != 180*24*time.Hour || schedule.MaxSnapshotsPerResource != 120 {
 		t.Fatalf("custom schedule changed: %#v", schedule)
 	}
 	fallback := (Schedule{}).normalized()
-	if fallback.Fast != 30*time.Second || fallback.Standard != 30*time.Second || fallback.Slow != 5*time.Minute || fallback.Metadata != 30*time.Minute || fallback.Retention != 30*24*time.Hour || fallback.MetricRawRetention != 24*time.Hour || fallback.MetricMediumRetention != 30*24*time.Hour || fallback.MetricLongRetention != 365*24*time.Hour {
+	if fallback.Fast != 30*time.Second || fallback.Standard != 30*time.Second || fallback.Slow != 5*time.Minute || fallback.Metadata != 30*time.Minute || fallback.Retention != 30*24*time.Hour || fallback.MetricRawRetention != 24*time.Hour || fallback.MetricMediumRetention != 30*24*time.Hour || fallback.MetricLongRetention != 365*24*time.Hour || fallback.MaxSnapshotsPerResource != 120 {
 		t.Fatalf("unexpected fallback schedule: %#v", fallback)
 	}
 }

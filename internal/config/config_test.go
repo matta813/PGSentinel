@@ -60,6 +60,21 @@ func TestLoadRejectsInvalidMetricRetentionDuration(t *testing.T) {
 	}
 }
 
+func TestLoadValidatesSnapshotSampleLimit(t *testing.T) {
+	t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "long-enough-encryption-key-32-chars")
+	t.Setenv("PGSENTINEL_ADMIN_PASSWORD", "long-enough-admin-password")
+	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
+	t.Setenv("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE", "9")
+	if _, err := Load(); err == nil {
+		t.Fatal("unsafe snapshot sample limit was accepted")
+	}
+	t.Setenv("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE", "250")
+	c, err := Load()
+	if err != nil || c.MaxSnapshotsPerResource != 250 {
+		t.Fatalf("valid snapshot sample limit rejected: %+v, %v", c, err)
+	}
+}
+
 func TestLoadParsesFanoutDatabaseLimit(t *testing.T) {
 	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
 	t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "test-encryption-key-32-chars-min")

@@ -29,6 +29,7 @@ type Config struct {
 	MetricMediumRetention           time.Duration
 	MetricLongRetention             time.Duration
 	FanoutDatabaseLimit             int
+	MaxSnapshotsPerResource         int
 	FrontendDir                     string
 }
 
@@ -63,12 +64,13 @@ func Load() (Config, error) {
 		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
 		FastInterval:             duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
 		SlowInterval: duration("PGSENTINEL_SLOW_INTERVAL", 5*time.Minute), MetaInterval: duration("PGSENTINEL_META_INTERVAL", 30*time.Minute),
-		Retention:             duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
-		MetricRawRetention:    metricRawRetention,
-		MetricMediumRetention: metricMediumRetention,
-		MetricLongRetention:   metricLongRetention,
-		FanoutDatabaseLimit:   positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
-		FrontendDir:           env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
+		Retention:               duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
+		MetricRawRetention:      metricRawRetention,
+		MetricMediumRetention:   metricMediumRetention,
+		MetricLongRetention:     metricLongRetention,
+		FanoutDatabaseLimit:     positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
+		MaxSnapshotsPerResource: positiveInt("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE", 120),
+		FrontendDir:             env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
 	}
 	if c.EncryptionKey == "" {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY is required; generate one with openssl rand -base64 32")
@@ -87,6 +89,9 @@ func Load() (Config, error) {
 	}
 	if c.MetricLongRetention < c.MetricMediumRetention || c.MetricLongRetention > 5*365*24*time.Hour {
 		return Config{}, fmt.Errorf("PGSENTINEL_METRIC_LONG_RETENTION must be at least the medium retention and no more than 43800h")
+	}
+	if c.MaxSnapshotsPerResource < 10 || c.MaxSnapshotsPerResource > 10000 {
+		return Config{}, fmt.Errorf("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE must be between 10 and 10000")
 	}
 	if err := os.MkdirAll(c.DataDir, 0o750); err != nil {
 		return Config{}, fmt.Errorf("create data directory: %w", err)

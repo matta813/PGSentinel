@@ -38,7 +38,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	notificationPolicy := notifications.NewTargetPolicy(cfg.AllowPrivateNotificationTargets, cfg.NotificationAllowedHosts)
-	manager := collector.NewManager(store, log, collector.Schedule{Fast: cfg.FastInterval, Standard: cfg.StatsInterval, Slow: cfg.SlowInterval, Metadata: cfg.MetaInterval, Retention: cfg.Retention, MetricRawRetention: cfg.MetricRawRetention, MetricMediumRetention: cfg.MetricMediumRetention, MetricLongRetention: cfg.MetricLongRetention, FanoutLimit: cfg.FanoutDatabaseLimit})
+	manager := collector.NewManager(store, log, collector.Schedule{Fast: cfg.FastInterval, Standard: cfg.StatsInterval, Slow: cfg.SlowInterval, Metadata: cfg.MetaInterval, Retention: cfg.Retention, MetricRawRetention: cfg.MetricRawRetention, MetricMediumRetention: cfg.MetricMediumRetention, MetricLongRetention: cfg.MetricLongRetention, FanoutLimit: cfg.FanoutDatabaseLimit, MaxSnapshotsPerResource: cfg.MaxSnapshotsPerResource})
 	manager.SetNotificationDispatcher(notifications.NewDispatcher(store, notificationPolicy, log))
 	go manager.Run(ctx)
 	authentication, err := auth.New(auth.Config{Store: store, Username: "admin", Password: cfg.BootstrapAdminPassword, SecureCookies: cfg.SecureCookies, TrustedProxies: cfg.TrustedProxyCIDRs})
