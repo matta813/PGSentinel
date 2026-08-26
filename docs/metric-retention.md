@@ -28,7 +28,7 @@ PGSENTINEL_METRIC_LONG_RETENTION=8760h
 
 The raw window must be between 1 hour and 30 days. The medium window must be at least as long as raw and no longer than 180 days. The long window must be at least as long as medium and no longer than 5 years. Startup rejects an unsafe ordering or out-of-range value.
 
-`PGSENTINEL_RETENTION` remains the independent raw snapshot retention setting. Findings, targets, users, and notification history are not removed by metric retention.
+`PGSENTINEL_RETENTION` remains the independent raw snapshot age setting. Full JSON snapshots are also capped by `PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE` (default `120`) for each server/resource pair. Both snapshot limits are enforced at startup and hourly. Findings, targets, users, and notification history are not removed by metric retention.
 
 ## Upgrades, sizing, and rollback
 

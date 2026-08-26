@@ -95,7 +95,7 @@ func TestTieredMetricRetentionAggregatesBeforeDeletingRawSamples(t *testing.T) {
 		t.Fatal(err)
 	}
 	policy := MetricRetentionPolicy{Raw: time.Hour, Medium: 30 * 24 * time.Hour, Long: 365 * 24 * time.Hour}
-	if err := s.PruneMonitoringHistory(ctx, now, 7*24*time.Hour, policy); err != nil {
+	if err := s.PruneMonitoringHistory(ctx, now, 7*24*time.Hour, 120, policy); err != nil {
 		t.Fatal(err)
 	}
 	var raw, mediumSamples, longSamples int
@@ -111,7 +111,7 @@ func TestTieredMetricRetentionAggregatesBeforeDeletingRawSamples(t *testing.T) {
 	if raw != 2 || mediumSamples != 10000 || longSamples != 10000 {
 		t.Fatalf("raw=%d medium samples=%d long samples=%d", raw, mediumSamples, longSamples)
 	}
-	if err := s.PruneMonitoringHistory(ctx, now, 7*24*time.Hour, policy); err != nil {
+	if err := s.PruneMonitoringHistory(ctx, now, 7*24*time.Hour, 120, policy); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(SUM(sample_count),0) FROM metric_aggregates WHERE tier='medium'`).Scan(&mediumSamples); err != nil || mediumSamples != 10000 {
@@ -142,7 +142,57 @@ func TestMetricRetentionRejectsUnsafePolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if err := s.PruneMonitoringHistory(context.Background(), time.Now(), 24*time.Hour, MetricRetentionPolicy{Raw: 24 * time.Hour, Medium: time.Hour, Long: 365 * 24 * time.Hour}); err == nil {
+	if err := s.PruneMonitoringHistory(context.Background(), time.Now(), 24*time.Hour, 120, MetricRetentionPolicy{Raw: 24 * time.Hour, Medium: time.Hour, Long: 365 * 24 * time.Hour}); err == nil {
 		t.Fatal("descending retention policy was accepted")
+	}
+}
+
+func TestSnapshotRetentionCapsEachServerAndResource(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "snapshot-cap.db"), "long-enough-encryption-key-32-chars")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	for _, serverID := range []string{"one", "two"} {
+		server := models.Server{ID: serverID, Name: serverID, Host: "localhost", Port: 5432, User: "monitor", Password: "secret", SSLMode: "disable"}
+		if err := s.CreateServer(ctx, &server); err != nil {
+			t.Fatal(err)
+		}
+		for _, kind := range []string{"core", "queries"} {
+			for sample := 0; sample < 15; sample++ {
+				if err := s.SaveSnapshot(ctx, serverID, kind, map[string]int{"sample": sample}, now.Add(time.Duration(sample)*time.Second)); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	policy := MetricRetentionPolicy{Raw: time.Hour, Medium: 2 * time.Hour, Long: 3 * time.Hour}
+	if err := s.PruneMonitoringHistory(ctx, now.Add(20*time.Second), time.Hour, 10, policy); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT server_id,kind,COUNT(*),MIN(json_extract(payload_json,'$.sample')) FROM snapshots GROUP BY server_id,kind`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	groups := 0
+	for rows.Next() {
+		var serverID, kind string
+		var count, oldest int
+		if err := rows.Scan(&serverID, &kind, &count, &oldest); err != nil {
+			t.Fatal(err)
+		}
+		if count != 10 || oldest != 5 {
+			t.Fatalf("%s/%s retained count=%d oldest=%d", serverID, kind, count, oldest)
+		}
+		groups++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if groups != 4 {
+		t.Fatalf("retained %d server/resource groups", groups)
 	}
 }
