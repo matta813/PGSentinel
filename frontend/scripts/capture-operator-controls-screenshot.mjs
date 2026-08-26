@@ -45,6 +45,7 @@ try {
       body = {
         authenticated: true,
         username: "admin",
+        role: "administrator",
         mustChangePassword: false,
       };
     else if (pathname === "/api/v1/version")
