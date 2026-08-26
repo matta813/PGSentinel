@@ -152,6 +152,7 @@ func (a *API) createNotificationDestination(w http.ResponseWriter, r *http.Reque
 		failure(w, 409, "Unable to save notification destination", err)
 		return
 	}
+	a.audit(r, "", "notification_destination.created", "notification_destination", v.ID, "A notification destination was added.")
 	write(w, 201, v)
 }
 
@@ -177,6 +178,7 @@ func (a *API) updateNotificationDestination(w http.ResponseWriter, r *http.Reque
 		failure(w, 409, "Unable to update notification destination", err)
 		return
 	}
+	a.audit(r, "", "notification_destination.updated", "notification_destination", id, "A notification destination was edited; credentials were not recorded.")
 	updated, _ := a.store.GetNotificationDestination(r.Context(), id, false)
 	write(w, 200, updated)
 }
@@ -194,6 +196,7 @@ func (a *API) deleteNotificationDestination(w http.ResponseWriter, r *http.Reque
 		failure(w, 500, "Unable to delete notification destination", err)
 		return
 	}
+	a.audit(r, "", "notification_destination.deleted", "notification_destination", id, "A notification destination was removed.")
 	w.WriteHeader(204)
 }
 
@@ -255,6 +258,7 @@ func (a *API) createNotificationRoute(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "Unable to save notification route", err)
 		return
 	}
+	a.audit(r, "", "notification_route.created", "notification_route", route.ID, "A notification routing rule was added.")
 	write(w, 201, route)
 }
 func (a *API) updateNotificationRoute(w http.ResponseWriter, r *http.Request) {
@@ -283,6 +287,7 @@ func (a *API) updateNotificationRoute(w http.ResponseWriter, r *http.Request) {
 		failure(w, 409, "Unable to update notification route", err)
 		return
 	}
+	a.audit(r, "", "notification_route.updated", "notification_route", id, "A notification routing rule was edited.")
 	routes, _ := a.store.ListNotificationRoutes(r.Context())
 	for _, saved := range routes {
 		if saved.ID == id {
@@ -305,6 +310,7 @@ func (a *API) deleteNotificationRoute(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to delete notification route", err)
 		return
 	}
+	a.audit(r, "", "notification_route.deleted", "notification_route", id, "A notification routing rule was removed.")
 	w.WriteHeader(204)
 }
 func (a *API) validateRouteReferences(r *http.Request, route *models.NotificationRoute) string {

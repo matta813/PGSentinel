@@ -36,6 +36,39 @@ func TestReplicationAndCheckpointRulesAreRoleAware(t *testing.T) {
 		}
 	}
 }
+
+func TestArchiveFailuresAndDelayedReplicaIntent(t *testing.T) {
+	now := time.Now().UTC()
+	old := now.Add(-time.Hour)
+	s := models.Snapshot{ServerID: "s", ServerTags: []string{"allow-delayed-replicas"}, Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}, Replication: models.ReplicationStats{Standbys: []models.ReplicationStandby{{Application: "delayed", State: "streaming", ReplayLagSeconds: 600, PendingReplayBytes: 1e9}}}, WAL: models.WALStats{ArchiveMode: "on", ArchiveConfigured: true, LastArchivedAt: &old, LastFailedAt: &now, LastFailedWAL: "000000010000000000000001", FailedArchiveCount: 4}}
+	got := New(DefaultThresholds()).Analyze(s)
+	if rulePresent(got, "standby-replay-lag") {
+		t.Fatal("intentional delayed replica raised replay lag finding")
+	}
+	if !rulePresent(got, "archive-failure-current") {
+		t.Fatal("current archive failure not reported")
+	}
+}
+
+func TestPausedRecoveryIsExplicit(t *testing.T) {
+	s := models.Snapshot{ServerID: "s", Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}, Replication: models.ReplicationStats{InRecovery: true, RecoveryPaused: true, Receiver: &models.WALReceiver{Status: "streaming"}, ReplayLSN: "1/2", TimelineID: 3}}
+	if got := New(DefaultThresholds()).Analyze(s); !rulePresent(got, "recovery-paused") {
+		t.Fatal("paused recovery not reported")
+	}
+}
+
+func TestRequestedRestartpointsAreStandbyOnly(t *testing.T) {
+	base := models.Snapshot{ServerID: "s", Capabilities: map[string]bool{"pg_stat_statements": true}, Settings: map[string]string{"track_io_timing": "on"}, WAL: models.WALStats{RestartpointsTimed: 8, RestartpointsRequested: 12, RestartpointsDone: 15}}
+	primary := New(DefaultThresholds()).Analyze(base)
+	if rulePresent(primary, "requested-restartpoints") {
+		t.Fatal("primary raised restartpoint finding")
+	}
+	base.Replication.InRecovery = true
+	base.Replication.Receiver = &models.WALReceiver{Status: "streaming"}
+	if got := New(DefaultThresholds()).Analyze(base); !rulePresent(got, "requested-restartpoints") {
+		t.Fatal("standby restartpoint pressure not reported")
+	}
+}
 func TestHealthScoreWeightsSeverity(t *testing.T) {
 	low := HealthScore([]models.Finding{{Status: "active", Severity: models.SeverityLow, Category: "Queries"}})
 	critical := HealthScore([]models.Finding{{Status: "active", Severity: models.SeverityCritical, Category: "Queries"}})

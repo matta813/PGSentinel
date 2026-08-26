@@ -56,7 +56,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 ### PostgreSQL visibility
 
 - Connections, transactions, databases, locks, tables, vacuum, indexes, and configuration
-- Role-aware replication, WAL retention, and checkpoint-pressure findings
+- Role-aware replication LSN gaps, slot retention growth, archive health, WAL rates, timelines, and checkpoint/restartpoint findings
 - Per-database table and index collection across a configurable number of databases
 - `pg_stat_statements` query load and multi-factor Query Impact Score
 - Reset-aware query regression detection with persistent anomalies, explicit comparison windows, and workload evidence
@@ -65,10 +65,13 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 ### Operations
 
 - Multiple PostgreSQL targets, tags, SSL modes, and connection diagnostics
-- Searchable operations inbox and 30-day raw snapshot retention by default
+- Searchable operations inbox, 30-day raw snapshot retention, and bounded tiered metric history
+- Conservative incident grouping with explained relationships and chronological finding timelines
 - Encrypted ntfy and generic webhook destinations with delivery tests
 - Deterministic notification routing by severity, category, server, tags, and lifecycle transition
 - Dedupe-safe delivery with cooldowns, bounded retry history, and redacted failure visibility
+- Searchable, bounded audit history for security and operator configuration changes
+- Scoped maintenance windows, temporary suppressions, and validated per-server/tag analyzer thresholds
 - Low-cardinality Prometheus metrics plus health and readiness endpoints
 
 ### Security and deployment

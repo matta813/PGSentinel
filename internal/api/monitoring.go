@@ -81,6 +81,10 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to load problems", err)
 		return
 	}
+	if err := a.store.ApplyOperatorControls(r.Context(), items, time.Now().UTC()); err != nil {
+		failure(w, 500, "Unable to apply operator controls", err)
+		return
+	}
 	write(w, 200, items)
 }
 func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +110,11 @@ func (a *API) updateProblemStatus(w http.ResponseWriter, r *http.Request) {
 		failure(w, 500, "Unable to update problem", err)
 		return
 	}
+	if request.Status == "acknowledged" {
+		a.audit(r, "", "finding.acknowledged", "finding", id, "A finding was acknowledged; its evidence and health impact remain available.")
+	} else {
+		a.audit(r, "", "finding.reopened", "finding", id, "An acknowledged finding was returned to active triage.")
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 func (a *API) overview(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +126,10 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 	findings, err := a.store.ListFindings(r.Context(), "open", "")
 	if err != nil {
 		failure(w, 500, "Unable to load overview", err)
+		return
+	}
+	if err := a.store.ApplyOperatorControls(r.Context(), findings, time.Now().UTC()); err != nil {
+		failure(w, 500, "Unable to apply operator controls", err)
 		return
 	}
 	counts := map[models.Severity]int{}
