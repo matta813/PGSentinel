@@ -168,6 +168,18 @@ type ThresholdOverride struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
+type RuleProfileEntry struct {
+	RuleID string  `json:"ruleId"`
+	Value  float64 `json:"value"`
+}
+type RuleProfile struct {
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Entries     []RuleProfileEntry `json:"entries"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
+}
 type Metric struct {
 	ServerID    string            `json:"serverId"`
 	Database    string            `json:"database,omitempty"`
