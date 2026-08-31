@@ -21,6 +21,15 @@ type AuditEvent struct {
 	ResourceID   string    `json:"resourceId,omitempty"`
 	Summary      string    `json:"summary"`
 }
+type ChangeEvent struct {
+	ID         string    `json:"id"`
+	ServerID   string    `json:"serverId"`
+	Kind       string    `json:"kind"`
+	Summary    string    `json:"summary"`
+	Details    []string  `json:"details"`
+	OccurredAt time.Time `json:"occurredAt"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
 
 type Severity string
 

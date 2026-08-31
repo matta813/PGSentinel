@@ -23,16 +23,17 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Persistent per-resource collection freshness, visible stale/partial evidence, and conservative confidence and health-score caps.
 - Server-enforced administrator, operator, and viewer roles with role-change session invalidation.
 - Bounded, redacted diagnostic bundles for reproducible support and analyzer feedback.
+- Query-regression correlation with recorded deployments and detected PostgreSQL configuration changes.
 
 ## Now
 
-### Expand query regression context
+### Expand notification delivery
 
-- Correlate the shipped interval-delta findings with deployments and configuration history.
+- Add more notification providers while preserving bounded retries and redacted errors.
 
 ## Next
 
-- Add more notification providers and reusable rule profiles.
+- Add reusable rule profiles with reviewed import and export.
 
 ## Later exploration
 

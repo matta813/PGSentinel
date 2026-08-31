@@ -215,7 +215,11 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			history, historyErr := m.store.RecentQueryObservations(ctx, server.ID, 10)
 			if historyErr == nil {
 				current := models.QueryObservation{CollectedAt: snapshot.CollectedAt, StatsResetAt: statsReset, PostmasterStartAt: postmasterStart, Queries: queries}
-				regressionFindings = analyzer.QueryRegressionFindings(server.ID, history, current)
+				var changes []models.ChangeEvent
+				if len(history) > 0 {
+					changes, _ = m.store.ListChangeEvents(ctx, server.ID, history[0].CollectedAt, current.CollectedAt, 50)
+				}
+				regressionFindings = analyzer.QueryRegressionFindings(server.ID, history, current, changes)
 				preserved, preserveErr := m.store.OpenFindingsByRule(ctx, server.ID, "query-regression")
 				if preserveErr != nil {
 					complete = false
@@ -289,9 +293,17 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		_ = m.store.LatestSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes)
 	}
 	if cycle&cycleMetadata != 0 {
+		previousSettings := map[string]string{}
+		_ = m.store.LatestSnapshot(ctx, server.ID, "configuration", &previousSettings)
 		settings, settingsErr := collector.CollectConfiguration(ctx)
 		if settingsErr == nil {
 			snapshot.Settings = settings
+			if details := changedSettings(previousSettings, settings); len(previousSettings) > 0 && len(details) > 0 {
+				event := models.ChangeEvent{ServerID: server.ID, Kind: "configuration", Summary: "Monitored PostgreSQL settings changed", Details: details, OccurredAt: snapshot.CollectedAt}
+				if err := m.store.RecordChangeEvent(ctx, &event); err != nil {
+					m.log.Warn("record configuration change", "server_id", server.ID, "error", err)
+				}
+			}
 			_ = m.store.SaveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt)
 			m.recordFresh(ctx, server.ID, "configuration", m.schedule.Metadata, snapshot.CollectedAt)
 		} else {
@@ -330,6 +342,20 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	status, lastError := collectionOutcome(complete)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, status, snapshot.Version, lastError, true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func changedSettings(before, after map[string]string) []string {
+	keys := make([]string, 0)
+	for key, value := range after {
+		if old, ok := before[key]; ok && old != value {
+			keys = append(keys, key+": "+old+" → "+value)
+		}
+	}
+	sort.Strings(keys)
+	if len(keys) > 50 {
+		keys = keys[:50]
+	}
+	return keys
 }
 
 func (m *Manager) recordFresh(ctx context.Context, serverID, resource string, interval time.Duration, at time.Time) {
