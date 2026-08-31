@@ -24,28 +24,59 @@ import { useMonitoring } from "../context/MonitoringContext";
 export function ProblemsPage() {
   const [urlParams, setUrlParams] = useSearchParams();
   const monitoring = useMonitoring();
-  const [severity, setSeverity] = useState(urlParams.get('severity') ?? "");
-  const [status, setStatus] = useState(urlParams.get('status') ?? "active");
-  const [category, setCategory] = useState(urlParams.get('category') ?? "");
-  const [search, setSearch] = useState(urlParams.get('search') ?? "");
+  const [severity, setSeverity] = useState(urlParams.get("severity") ?? "");
+  const [status, setStatus] = useState(urlParams.get("status") ?? "active");
+  const [category, setCategory] = useState(urlParams.get("category") ?? "");
+  const [search, setSearch] = useState(urlParams.get("search") ?? "");
   const [message, setMessage] = useState("");
   const selectedId = urlParams.get("id");
   const query = new URLSearchParams({ status });
   if (severity) query.set("severity", severity);
   if (category.trim()) query.set("category", category.trim());
   if (search.trim()) query.set("search", search.trim());
-  if (monitoring.selectedServerId) query.set('serverId', monitoring.selectedServerId)
+  if (monitoring.selectedServerId)
+    query.set("serverId", monitoring.selectedServerId);
+  if (monitoring.selectedDatabase)
+    query.set("database", monitoring.selectedDatabase);
   const { data, error, loading, reload } = useApi(
     () => api.get<Finding[]>(`/problems?${query}`),
-    [status, severity, category, search, monitoring.selectedServerId],
+    [
+      status,
+      severity,
+      category,
+      search,
+      monitoring.selectedServerId,
+      monitoring.selectedDatabase,
+    ],
   );
   useEffect(() => {
-    const next = new URLSearchParams()
-    if (selectedId) next.set('id', selectedId)
-    for (const [key, value] of [['status', status], ['severity', severity], ['category', category], ['search', search]]) { if (value) next.set(key, value); else next.delete(key) }
-    if (status === 'active') next.delete('status')
-    setUrlParams(next, { replace: true })
-  }, [status, severity, category, search, selectedId, setUrlParams])
+    const next = new URLSearchParams();
+    if (selectedId) next.set("id", selectedId);
+    if (monitoring.selectedServerId)
+      next.set("serverId", monitoring.selectedServerId);
+    if (monitoring.selectedDatabase)
+      next.set("database", monitoring.selectedDatabase);
+    for (const [key, value] of [
+      ["status", status],
+      ["severity", severity],
+      ["category", category],
+      ["search", search],
+    ]) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    if (status === "active") next.delete("status");
+    setUrlParams(next, { replace: true });
+  }, [
+    status,
+    severity,
+    category,
+    search,
+    selectedId,
+    monitoring.selectedServerId,
+    monitoring.selectedDatabase,
+    setUrlParams,
+  ]);
   useEffect(() => {
     if (selectedId && data)
       document
