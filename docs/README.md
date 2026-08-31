@@ -7,6 +7,7 @@
 - [Health rules](health-rules.md): evidence, thresholds, confidence, and health scoring
 - [Notifications](notifications.md): destinations, routing rules, cooldowns, retries, and delivery history
 - [Operator controls](operator-controls.md): maintenance windows, suppressions, and scoped thresholds
+- [Rule profiles](rule-profiles.md): validated threshold sets, import/export, preview, and scoped application
 - [Audit log](audit-log.md): recorded actions, secret boundaries, search, and retention
 - [Diagnostic bundles](diagnostic-bundles.md): bounded, redacted support exports and their remaining metadata
 - [Change history](change-history.md): deployment markers, detected configuration changes, and query-regression correlation

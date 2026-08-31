@@ -24,6 +24,7 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Server-enforced administrator, operator, and viewer roles with role-change session invalidation.
 - Bounded, redacted diagnostic bundles for reproducible support and analyzer feedback.
 - Query-regression correlation with recorded deployments and detected PostgreSQL configuration changes.
+- Reusable, validated analyzer rule profiles with previewed import, export, and scoped application.
 
 ## Now
 
@@ -33,11 +34,10 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 
 ## Next
 
-- Add reusable rule profiles with reviewed import and export.
+- Explicit, guarded `EXPLAIN (FORMAT JSON)` support for safe read-only statements.
 
 ## Later exploration
 
-- Explicit, guarded `EXPLAIN (FORMAT JSON)` support for safe read-only statements.
 - Optional agent-assisted host metrics with clear provenance.
 - Import/export of reviewed rule profiles and redacted troubleshooting data.
 

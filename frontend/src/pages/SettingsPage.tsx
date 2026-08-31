@@ -8,6 +8,7 @@ import type { Server } from '../types'
 import type { NotificationDelivery, NotificationDestination, NotificationRoute } from '../types/notifications'
 import { OperatorControlsSettings } from '../components/OperatorControlsSettings'
 import { ChangeHistorySettings } from '../components/ChangeHistorySettings'
+import { RuleProfilesSettings } from '../components/RuleProfilesSettings'
 
 const severities = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 const transitions = ['new', 'severity_increased', 'reopened', 'resolved']
@@ -43,6 +44,7 @@ export function SettingsPage() {
       </section>
       <section id="delivery-history"><SectionHeader title="Delivery history" description="The latest 50 delivery attempts. Retry errors are redacted and credentials are never shown." />{deliveries.data?.length === 0 ? <Empty title="No delivery history" detail="Lifecycle notifications will appear here after findings match a route." /> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Created</th><th>Finding</th><th>Destination</th><th>Transition</th><th>Result</th><th>Attempts</th></tr></thead><tbody>{deliveries.data?.map(item => <tr key={`${item.eventId}-${item.destinationId}`}><td>{new Date(item.createdAt).toLocaleString()}</td><td><strong>{item.findingTitle}</strong><small>{item.serverName || item.serverId} · {item.severity} · {item.category}</small></td><td>{item.destinationName || 'Deleted destination'}</td><td>{item.eventType.replaceAll('_', ' ')}</td><td><span className={`delivery-status ${item.status}`}>{item.status}</span>{item.lastError && <small title={item.lastError}>{item.lastError}</small>}</td><td>{item.attempts}</td></tr>)}</tbody></table></div>}</section>
       <OperatorControlsSettings />
+      <RuleProfilesSettings />
       <ChangeHistorySettings />
       <section id="diagnostics"><SectionHeader title="Diagnostic bundle" description="Export bounded support evidence without database credentials, server addresses, connection details, or raw SQL text." /><p className="muted">The ZIP contains build metadata, redacted server status, up to 1,000 findings, and collection freshness. Always review it before sharing.</p><div className="form-actions"><button type="button" className="button secondary" onClick={() => void downloadDiagnostics()}><Download /> Download diagnostic bundle</button></div></section>
       {status && <Notice>{status}</Notice>}
