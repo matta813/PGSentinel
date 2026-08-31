@@ -40,6 +40,21 @@ func TestRolePermissionBoundaries(t *testing.T) {
 	}
 }
 
+func TestServeFrontendDoesNotUseSPAFallbackForAPIRequests(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "index.html"), []byte("<!doctype html>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &API{mux: http.NewServeMux()}
+	a.ServeFrontend(directory)
+
+	r := httptest.NewRecorder()
+	a.mux.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/missing", nil))
+	if r.Code != http.StatusNotFound || r.Header().Get("Content-Type") != "application/json" || !strings.Contains(r.Body.String(), "API endpoint not found") {
+		t.Fatalf("unexpected API fallback: status=%d content-type=%q body=%q", r.Code, r.Header().Get("Content-Type"), r.Body.String())
+	}
+}
+
 func testAPI(t *testing.T) http.Handler {
 	t.Helper()
 	s, err := storage.Open(filepath.Join(t.TempDir(), "api.db"), "a sufficiently long api test key")

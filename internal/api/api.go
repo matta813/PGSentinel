@@ -96,6 +96,10 @@ func (a *API) ServeFrontend(directory string) {
 	files := http.FileServerFS(frontend)
 	index, indexErr := fs.ReadFile(frontend, "index.html")
 	a.mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			failure(w, http.StatusNotFound, "API endpoint not found", nil)
+			return
+		}
 		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
 		if name != "" && fs.ValidPath(name) {
 			if info, err := fs.Stat(frontend, name); err == nil && !info.IsDir() {
