@@ -44,5 +44,5 @@ test('renders the authenticated app when the session endpoint reports authentica
   render(<MemoryRouter><App /></MemoryRouter>)
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument())
   expect(await screen.findByRole('navigation', { name: 'Primary navigation' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
 })

@@ -9,6 +9,11 @@ export function SectionHeader({ title, description, action }: { title: string; d
   return <div className="section-header"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</div>
 }
 
+export function KPIGrid({ children }: { children: ReactNode }) { return <div className="kpi-grid">{children}</div> }
+export function KPI({ label, value, detail, tone = 'neutral' }: { label: string; value: ReactNode; detail?: string; tone?: 'neutral' | 'success' | 'warning' | 'danger' }) { return <div className={`kpi ${tone}`}><span>{label}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</div> }
+export function DataPanel({ title, meta, children }: { title?: string; meta?: ReactNode; children: ReactNode }) { return <section className="data-panel">{(title || meta) && <header><h2>{title}</h2>{meta}</header>}{children}</section> }
+export function PageTabs({ children, label = 'Page sections' }: { children: ReactNode; label?: string }) { return <nav className="page-tabs" aria-label={label}>{children}</nav> }
+
 export function Notice({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'danger' | 'success' | 'warning' }) {
   return <div className={`notice notice-${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>{(tone === 'danger' || tone === 'warning') && <TriangleAlert />}{children}</div>
 }
