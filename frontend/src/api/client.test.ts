@@ -21,3 +21,14 @@ test('accepts JSON when an intermediary omits the JSON content type', async () =
 
   await expect(api.get('/incidents')).resolves.toEqual([{ id: 'incident-1' }])
 })
+
+test('downloads a binary response using the server filename', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('bundle', {
+    status: 200,
+    headers: { 'Content-Disposition': 'attachment; filename="diagnostics.zip"' },
+  }))
+
+  const result = await api.download('/diagnostic-bundle')
+  expect(result.filename).toBe('diagnostics.zip')
+  expect(await result.blob.text()).toBe('bundle')
+})

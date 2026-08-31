@@ -22,29 +22,22 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 - Durable, secret-free audit history for authentication and operator configuration changes.
 - Persistent per-resource collection freshness, visible stale/partial evidence, and conservative confidence and health-score caps.
 - Server-enforced administrator, operator, and viewer roles with role-change session invalidation.
+- Bounded, redacted diagnostic bundles for reproducible support and analyzer feedback.
 
 ## Now
 
-### Make data freshness explicit
-
-- Track freshness and completeness per collector/resource instead of representing a target as only healthy or failed.
-- Surface partial collections and stale snapshots in the API and UI so cached evidence cannot be mistaken for current evidence.
-- Include freshness in confidence and health calculations without resolving findings merely because a collector temporarily failed.
 ### Expand query regression context
 
-- Retain longer regression windows and correlate the shipped interval-delta findings with deployments and configuration history.
-- Account for `pg_stat_statements` resets, minimum sample sizes, workload volume, and natural variance before creating a finding.
-- Explain the compared windows and contributing impact signals rather than presenting a context-free percentage.
+- Correlate the shipped interval-delta findings with deployments and configuration history.
 
 ## Next
 
-- Export redacted diagnostic bundles that make support and analyzer feedback reproducible without exposing credentials or raw production queries.
+- Add more notification providers and reusable rule profiles.
 
 ## Later exploration
 
 - Explicit, guarded `EXPLAIN (FORMAT JSON)` support for safe read-only statements.
 - Optional agent-assisted host metrics with clear provenance.
-- Additional notification providers and reusable rule profiles.
 - Import/export of reviewed rule profiles and redacted troubleshooting data.
 
 ## Delivery requirements

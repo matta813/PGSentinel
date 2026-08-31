@@ -49,7 +49,7 @@ func allowed(role, method, path string) bool {
 	if role == "administrator" {
 		return true
 	}
-	if strings.HasPrefix(path, "/api/v1/users") || strings.HasPrefix(path, "/api/v1/audit-events") {
+	if strings.HasPrefix(path, "/api/v1/users") || strings.HasPrefix(path, "/api/v1/audit-events") || path == "/api/v1/diagnostic-bundle" {
 		return false
 	}
 	if path == "/api/v1/auth/session" || path == "/api/v1/auth/logout" || path == "/api/v1/auth/password" {
