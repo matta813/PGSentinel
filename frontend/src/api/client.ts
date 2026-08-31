@@ -28,4 +28,15 @@ export const api = {
   post: <T>(path: string, value?: unknown) => request<T>(path, { method: 'POST', body: value === undefined ? undefined : JSON.stringify(value) }),
   put: <T>(path: string, value: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(value) }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
+  download: async (path: string) => {
+    const response = await fetch(base + path, { credentials: 'same-origin' })
+    if (!response.ok) {
+      if (response.status === 401) window.dispatchEvent(new Event('pgsentinel:unauthorized'))
+      let body: { error?: string; detail?: string } = {}
+      try { body = await response.json() } catch { /* malformed error response */ }
+      throw new APIError(body.error ?? 'Download failed', body.detail ?? '', response.status)
+    }
+    const match = response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)
+    return { blob: await response.blob(), filename: match?.[1] ?? 'pgsentinel-download' }
+  },
 }

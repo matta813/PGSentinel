@@ -28,9 +28,11 @@ func TestRolePermissionBoundaries(t *testing.T) {
 		{"operator", http.MethodPut, "/api/v1/problems/abc/status", true},
 		{"operator", http.MethodPost, "/api/v1/servers", false},
 		{"operator", http.MethodGet, "/api/v1/audit-events", false},
+		{"operator", http.MethodGet, "/api/v1/diagnostic-bundle", false},
 		{"viewer", http.MethodGet, "/api/v1/incidents", true},
 		{"viewer", http.MethodPut, "/api/v1/problems/abc/status", false},
 		{"viewer", http.MethodGet, "/api/v1/users", false},
+		{"viewer", http.MethodGet, "/api/v1/diagnostic-bundle", false},
 		{"viewer", http.MethodPut, "/api/v1/auth/password", true},
 	}
 	for _, tc := range cases {
