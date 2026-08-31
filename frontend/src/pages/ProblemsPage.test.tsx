@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import { ProblemsPage } from "./ProblemsPage";
+import { MonitoringProvider } from "../context/MonitoringContext";
 
 afterEach(() => {
   cleanup();
@@ -54,7 +55,7 @@ test("shows regression windows samples and significance beside the conclusion", 
   );
   render(
     <MemoryRouter initialEntries={["/problems?id=regression"]}>
-      <ProblemsPage />
+      <MonitoringProvider><ProblemsPage /></MonitoringProvider>
     </MemoryRouter>,
   );
   expect(await screen.findByText("Current window")).toBeInTheDocument();
@@ -99,7 +100,7 @@ test("shows suppression without hiding finding evidence", async () => {
   );
   render(
     <MemoryRouter initialEntries={["/problems?id=finding"]}>
-      <ProblemsPage />
+      <MonitoringProvider><ProblemsPage /></MonitoringProvider>
     </MemoryRouter>,
   );
   expect(

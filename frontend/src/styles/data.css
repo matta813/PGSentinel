@@ -225,3 +225,20 @@
 .auth-logout svg { width: 13px; }
 .button-spinner { width: 12px; height: 12px; border: 2px solid rgba(7, 17, 15, .3); border-top-color: #07110f; border-radius: 50%; animation: spin .8s linear infinite; }
 .auth-loading { color: var(--text-muted); font-size: 11px; }
+.data-table { overflow:auto; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--surface-1); }
+.table-toolbar + .data-table { border-radius:0 0 var(--radius-md) var(--radius-md); }
+.data-table table { width:100%; border-collapse:collapse; }
+.data-table thead { position:sticky; top:0; z-index:1; }
+.data-table th { height:38px; padding:0 12px; border-bottom:1px solid var(--border-default); color:var(--text-secondary); background:var(--surface-2); font-size:10px; font-weight:600; letter-spacing:.035em; text-transform:uppercase; white-space:nowrap; }
+.data-table td { height:43px; padding:7px 12px; border-bottom:1px solid var(--border-subtle); font-size:12px; vertical-align:middle; }
+.data-table tr:last-child td { border-bottom:0; }.data-table tbody tr:hover { background:color-mix(in srgb,var(--info) 4%,var(--surface-1)); }
+.data-table .numeric { text-align:right; font-variant-numeric:tabular-nums; }.data-table th.numeric .sort-button { width:100%; }
+.query-text { display:-webkit-box; max-width:650px; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:var(--text-primary); line-height:1.35; white-space:normal; }
+.table-context { min-height:42px; margin-top:12px; padding:0 12px; border:1px solid var(--border-default); border-bottom:0; border-radius:var(--radius-md) var(--radius-md) 0 0; background:var(--surface-1); }
+.table-context + .data-table,.table-context ~ .form-stack > .data-table:first-child { border-radius:0 0 var(--radius-md) var(--radius-md); }
+.overview-top { align-items:stretch; grid-template-columns:minmax(250px,340px) minmax(0,1fr); }
+.health-score { border-radius:var(--radius-md); box-shadow:none; }
+.attention-list,.inbox { border-radius:var(--radius-md); box-shadow:none; }
+.attention-row { min-height:51px; padding:8px 12px; }
+.finding > summary { min-height:48px; padding:7px 12px; }.finding-detail { padding:0 18px 14px; }.finding-detail section { padding:16px 0; border-bottom:1px solid var(--border-subtle); }.finding-detail section:last-of-type { border-bottom:0; }
+.finding-detail section h3 { font-size:12px; text-transform:uppercase; letter-spacing:.04em; }

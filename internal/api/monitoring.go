@@ -153,7 +153,14 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score})
+	freshness := make(map[string][]models.CollectionResourceStatus, len(servers))
+	for _, server := range servers {
+		items, freshnessErr := a.store.ListCollectionResources(r.Context(), server.ID, time.Now())
+		if freshnessErr == nil {
+			freshness[server.ID] = items
+		}
+	}
+	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score, "freshness": freshness})
 }
 func (a *API) serverFreshness(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
