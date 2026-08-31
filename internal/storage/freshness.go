@@ -36,6 +36,27 @@ func (s *Store) ListCollectionResources(ctx context.Context, serverID string, no
 		return nil, err
 	}
 	defer rows.Close()
+	return scanCollectionResources(rows, now)
+}
+
+func (s *Store) ListAllCollectionResources(ctx context.Context, now time.Time) (map[string][]models.CollectionResourceStatus, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT server_id,resource,state,last_attempt_at,last_success_at,expected_interval_seconds,consecutive_failures,error_summary FROM collection_resource_status ORDER BY server_id,resource`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items, err := scanCollectionResources(rows, now)
+	if err != nil {
+		return nil, err
+	}
+	grouped := make(map[string][]models.CollectionResourceStatus)
+	for _, item := range items {
+		grouped[item.ServerID] = append(grouped[item.ServerID], item)
+	}
+	return grouped, nil
+}
+
+func scanCollectionResources(rows *sql.Rows, now time.Time) ([]models.CollectionResourceStatus, error) {
 	items := []models.CollectionResourceStatus{}
 	for rows.Next() {
 		var item models.CollectionResourceStatus

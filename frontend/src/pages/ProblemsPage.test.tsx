@@ -1,11 +1,13 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import { ProblemsPage } from "./ProblemsPage";
+import { MonitoringProvider } from "../context/MonitoringContext";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 test("shows regression windows samples and significance beside the conclusion", async () => {
@@ -54,7 +56,9 @@ test("shows regression windows samples and significance beside the conclusion", 
   );
   render(
     <MemoryRouter initialEntries={["/problems?id=regression"]}>
-      <ProblemsPage />
+      <MonitoringProvider>
+        <ProblemsPage />
+      </MonitoringProvider>
     </MemoryRouter>,
   );
   expect(await screen.findByText("Current window")).toBeInTheDocument();
@@ -99,7 +103,9 @@ test("shows suppression without hiding finding evidence", async () => {
   );
   render(
     <MemoryRouter initialEntries={["/problems?id=finding"]}>
-      <ProblemsPage />
+      <MonitoringProvider>
+        <ProblemsPage />
+      </MonitoringProvider>
     </MemoryRouter>,
   );
   expect(
@@ -112,4 +118,48 @@ test("shows suppression without hiding finding evidence", async () => {
   expect(
     screen.queryByRole("button", { name: /suppress/i }),
   ).not.toBeInTheDocument();
+});
+
+test("sends the selected server and database to the problems API", async () => {
+  const values = new Map([
+    ["monitoring.server", "primary"],
+    ["monitoring.database.primary", "app"],
+  ]);
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  });
+  const requests: string[] = [];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    requests.push(url);
+    const body = url.endsWith("/servers")
+      ? [{ id: "primary", name: "Primary", status: "healthy" }]
+      : url.endsWith("/databases")
+        ? { databases: [{ Name: "app" }] }
+        : [];
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+  render(
+    <MemoryRouter initialEntries={["/problems"]}>
+      <MonitoringProvider>
+        <ProblemsPage />
+      </MonitoringProvider>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("No matching findings")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(
+      requests.some(
+        (url) =>
+          url.includes("/problems?") &&
+          url.includes("serverId=primary") &&
+          url.includes("database=app"),
+      ),
+    ).toBe(true),
+  );
 });

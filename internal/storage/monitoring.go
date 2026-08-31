@@ -315,8 +315,8 @@ func routeTagsMatch(raw string, serverTags []string) bool {
 }
 
 type FindingFilter struct {
-	Status, ServerID, Severity, Category, Search, RuleID string
-	Limit                                                int
+	Status, ServerID, Database, Severity, Category, Search, RuleID string
+	Limit                                                          int
 }
 
 func (s *Store) ListFindings(ctx context.Context, status, serverID string) ([]models.Finding, error) {
@@ -335,6 +335,10 @@ func (s *Store) FilterFindings(ctx context.Context, filter FindingFilter) ([]mod
 	if filter.ServerID != "" {
 		q += " AND server_id=?"
 		args = append(args, filter.ServerID)
+	}
+	if filter.Database != "" {
+		q += " AND database_name=?"
+		args = append(args, filter.Database)
 	}
 	if filter.Severity != "" {
 		q += " AND severity=?"

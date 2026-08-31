@@ -22,5 +22,6 @@ test('counts only healthy servers as online', async () => {
 
   render(<MemoryRouter><OverviewPage /></MemoryRouter>)
 
-  expect(await screen.findByText('1 online')).toBeInTheDocument()
+  expect(await screen.findByText('Servers online')).toBeInTheDocument()
+  expect(screen.getByText('of 3')).toBeInTheDocument()
 })

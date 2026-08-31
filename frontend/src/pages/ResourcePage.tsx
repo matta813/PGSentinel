@@ -1,28 +1,28 @@
-import { useState, type ReactNode } from "react";
-import { Database, Info } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, Info, Search } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { api, APIError } from "../api/client";
 import { Empty, ErrorState, Loading } from "../components/Status";
-import { PageHeader } from "../components/UI";
+import { KPI, KPIGrid, PageHeader } from "../components/UI";
 import { useApi } from "../hooks/useApi";
+import { useMonitoring } from "../context/MonitoringContext";
 import type {
   IndexStat,
   LockInfo,
   CollectionResourceStatus,
   QueryStat,
-  Server,
   TableStat,
 } from "../types";
 import type { ReplicationStats, WALStats } from "../types/replication";
 
 const titles: Record<string, [string, string, string]> = {
   queries: [
-    "Query performance",
+    "Query Performance",
     "Queries",
     "Total impact, latency, disk reads, temporary I/O, and WAL activity.",
   ],
   tables: [
-    "Table health",
+    "Tables",
     "Tables",
     "Storage footprint, access patterns, and tuple health across monitored tables.",
   ],
@@ -32,12 +32,12 @@ const titles: Record<string, [string, string, string]> = {
     "Usage evidence and cautious identification of potentially unused indexes.",
   ],
   vacuum: [
-    "Vacuum health",
+    "Vacuum",
     "Vacuum",
     "Dead tuples and progress toward estimated autovacuum thresholds.",
   ],
   locks: [
-    "Live blocking",
+    "Locks",
     "Locks",
     "Current blocked sessions, their blockers, and blocking duration.",
   ],
@@ -47,16 +47,15 @@ const titles: Record<string, [string, string, string]> = {
     "Role, timeline, LSN byte gaps, receiver state, and slot retention evidence.",
   ],
   wal: [
-    "WAL and archive intelligence",
+    "WAL & Archive",
     "WAL & archive",
     "WAL generation, checkpoint or restartpoint behavior, and archive outcomes.",
   ],
 };
 export function ResourcePage() {
   const { resource = "queries" } = useParams();
-  const [server, setServer] = useState("");
-  const servers = useApi(() => api.get<Server[]>("/servers"), []);
-  const selected = server || servers.data?.[0]?.id || "";
+  const monitoring = useMonitoring();
+  const selected = monitoring.selectedServerId;
   const result = useApi(
     () =>
       selected
@@ -67,19 +66,28 @@ export function ResourcePage() {
   const freshness = useApi(
     () =>
       selected
-        ? api.get<CollectionResourceStatus[]>(`/servers/${selected}/freshness`).catch((error: unknown) => {
-            if (error instanceof APIError && error.status === 404) return [];
-            throw error;
-          })
+        ? api
+            .get<CollectionResourceStatus[]>(`/servers/${selected}/freshness`)
+            .catch((error: unknown) => {
+              if (error instanceof APIError && error.status === 404) return [];
+              throw error;
+            })
         : Promise.resolve([]),
     [selected, resource],
   );
-  if (servers.loading || result.loading || freshness.loading)
+  if (monitoring.serversLoading || result.loading || freshness.loading)
     return <Loading />;
-  if (servers.error || result.error || freshness.error)
+  if (monitoring.serversError)
     return (
       <ErrorState
-        error={servers.error ?? result.error ?? freshness.error!}
+        error={monitoring.serversError}
+        retry={monitoring.reloadServers}
+      />
+    );
+  if (result.error || freshness.error)
+    return (
+      <ErrorState
+        error={result.error ?? freshness.error!}
         retry={result.reload}
       />
     );
@@ -88,7 +96,7 @@ export function ResourcePage() {
     "Evidence",
     "Collected PostgreSQL evidence.",
   ];
-  const currentServer = servers.data?.find((item) => item.id === selected);
+  const currentServer = monitoring.selectedServer;
   const quality = Array.isArray(freshness.data)
     ? freshness.data.find((item) => item.resource === resource)
     : undefined;
@@ -97,22 +105,8 @@ export function ResourcePage() {
       <PageHeader
         title={title[0]}
         description={title[2]}
-        actions={
-          <label className="server-select">
-            <Database />
-            <span className="sr-only">Server</span>
-            <select
-              aria-label="Server"
-              value={selected}
-              onChange={(event) => setServer(event.target.value)}
-            >
-              {servers.data?.map((item) => (
-                <option value={item.id} key={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        meta={
+          resource === "queries" ? "Latest collected query snapshot" : undefined
         }
       />
       {selected && (
@@ -137,10 +131,109 @@ export function ResourcePage() {
           detail="Add a PostgreSQL server before viewing collected evidence."
         />
       ) : (
-        <ResourceTable resource={resource} data={result.data ?? []} />
+        <>
+          <ResourceSummary
+            resource={resource}
+            data={result.data ?? []}
+            database={monitoring.selectedDatabase}
+            quality={quality}
+          />
+          <ResourceTable
+            resource={resource}
+            data={result.data ?? []}
+            database={monitoring.selectedDatabase}
+          />
+        </>
       )}
     </>
   );
+}
+function ResourceSummary({
+  resource,
+  data,
+  database,
+  quality,
+}: {
+  resource: string;
+  data: unknown;
+  database: string;
+  quality?: CollectionResourceStatus;
+}) {
+  if (!Array.isArray(data)) return null;
+  const rows = data.filter(
+    (row) => !database || (row as { Database?: string }).Database === database,
+  );
+  if (database && data.length > 0 && rows.length === 0) return null;
+  if (resource === "indexes") {
+    const indexes = rows as IndexStat[];
+    const candidates = indexes.filter(
+      (index) => index.Scans === 0 && !index.Primary && !index.Unique,
+    ).length;
+    return (
+      <KPIGrid>
+        <KPI label="Observed indexes" value={indexes.length} />
+        <KPI
+          label="Total index size"
+          value={bytes(
+            indexes.reduce((sum, index) => sum + index.SizeBytes, 0),
+          )}
+        />
+        <KPI
+          label="Potentially unused"
+          value={candidates}
+          tone={candidates ? "warning" : "success"}
+        />
+      </KPIGrid>
+    );
+  }
+  if (resource === "vacuum") {
+    const tables = rows as TableStat[];
+    const approaching = tables.filter(
+      (table) => table.VacuumProgress >= 80,
+    ).length;
+    return (
+      <KPIGrid>
+        <KPI label="Tables monitored" value={tables.length} />
+        <KPI
+          label="Total dead tuples"
+          value={fmt(tables.reduce((sum, table) => sum + table.DeadTuples, 0))}
+        />
+        <KPI
+          label="Approaching threshold"
+          value={approaching}
+          tone={approaching ? "warning" : "success"}
+        />
+      </KPIGrid>
+    );
+  }
+  if (resource === "locks") {
+    const locks = rows as LockInfo[];
+    const hasFreshEvidence = quality?.state === "fresh";
+    if (!locks.length && !hasFreshEvidence)
+      return (
+        <div className="status-panel warning">
+          <strong>No current lock evidence available</strong>
+          <span>
+            A fresh lock snapshot is required before blocking can be ruled out.
+          </span>
+        </div>
+      );
+    return (
+      <div className={`status-panel ${locks.length ? "danger" : "success"}`}>
+        <strong>
+          {locks.length
+            ? `${locks.length} blocking session${locks.length === 1 ? "" : "s"} detected`
+            : "No blocking sessions detected"}
+        </strong>
+        <span>
+          {locks.length
+            ? "Inspect the blocking chain and duration below."
+            : "The latest lock snapshot contains no blocked sessions."}
+        </span>
+      </div>
+    );
+  }
+  return null;
 }
 function FreshnessNotice({ quality }: { quality?: CollectionResourceStatus }) {
   if (quality?.state === "fresh") return null;
@@ -178,14 +271,27 @@ function duration(seconds: number) {
 function ResourceTable({
   resource,
   data,
+  database,
 }: {
   resource: string;
   data: unknown;
+  database: string;
 }) {
   if (resource === "replication")
     return <ReplicationView value={data as ReplicationStats} />;
   if (resource === "wal") return <WALView value={data as WALStats} />;
-  const rows = data as unknown[];
+  const allRows = data as unknown[];
+  const rows = allRows.filter(
+    (row) => !database || (row as { Database?: string }).Database === database,
+  );
+  if (database && allRows.length > 0 && rows.length === 0)
+    return (
+      <Empty
+        title="No data for the selected database"
+        detail={`The latest ${resourceLabel(resource)} snapshot contains data for this server, but none for ${database}.`}
+      />
+    );
+  if (resource === "locks" && rows.length === 0) return null;
   if (rows.length === 0)
     return (
       <Empty
@@ -193,30 +299,7 @@ function ResourceTable({
         detail="Evidence will appear after a successful monitoring cycle."
       />
     );
-  if (resource === "queries")
-    return (
-      <Table
-        headers={[
-          "Query",
-          "Database",
-          "Calls",
-          "Avg latency",
-          "Total runtime",
-          "Impact",
-        ]}
-        numeric={[2, 3, 4, 5]}
-        rows={(rows as QueryStat[]).map((query) => [
-          <code className="query-text" title={query.Query}>
-            {query.Query}
-          </code>,
-          query.Database,
-          fmt(query.Calls),
-          `${fmt(query.MeanExecMS)} ms`,
-          `${fmt(query.TotalExecMS)} ms`,
-          query.ImpactScore.toFixed(1),
-        ])}
-      />
-    );
+  if (resource === "queries") return <QueryTable rows={rows as QueryStat[]} />;
   if (resource === "indexes")
     return (
       <Table
@@ -292,13 +375,125 @@ function ResourceTable({
         resource === "vacuum"
           ? fmt(item.VacuumThreshold)
           : fmt(item.IndexScans),
-        resource === "vacuum"
-          ? `${Math.round(item.VacuumProgress)}%`
-          : item.LastAutovacuum
-            ? new Date(item.LastAutovacuum).toLocaleString()
-            : "Never",
+        resource === "vacuum" ? (
+          <span className="progress-cell">
+            <i>
+              <b
+                style={{
+                  width: `${Math.min(100, Math.max(0, item.VacuumProgress))}%`,
+                }}
+              />
+            </i>
+            <span>{Math.round(item.VacuumProgress)}%</span>
+          </span>
+        ) : item.LastAutovacuum ? (
+          new Date(item.LastAutovacuum).toLocaleString()
+        ) : (
+          "Never"
+        ),
       ])}
     />
+  );
+}
+function resourceLabel(resource: string) {
+  return (
+    (
+      {
+        queries: "query",
+        tables: "table",
+        indexes: "index",
+        vacuum: "vacuum",
+        locks: "lock",
+      } as Record<string, string>
+    )[resource] ?? resource
+  );
+}
+
+type QuerySort = "Calls" | "MeanExecMS" | "TotalExecMS" | "ImpactScore";
+function QueryTable({ rows }: { rows: QueryStat[] }) {
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<QuerySort>("ImpactScore");
+  const [ascending, setAscending] = useState(false);
+  const visible = useMemo(
+    () =>
+      rows
+        .filter((row) => row.Query.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => (a[sort] - b[sort]) * (ascending ? 1 : -1)),
+    [rows, search, sort, ascending],
+  );
+  function heading(label: string, key?: QuerySort) {
+    return key ? (
+      <button
+        className="sort-button"
+        onClick={() => {
+          if (sort === key) setAscending((value) => !value);
+          else {
+            setSort(key);
+            setAscending(false);
+          }
+        }}
+        aria-label={`Sort by ${label}`}
+      >
+        {label}
+        {sort === key && (ascending ? <ArrowUp /> : <ArrowDown />)}
+      </button>
+    ) : (
+      label
+    );
+  }
+  return (
+    <>
+      <div className="table-toolbar">
+        <label className="search-field">
+          <Search />
+          <span className="sr-only">Search query text</span>
+          <input
+            aria-label="Search query text"
+            placeholder="Search SQL text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <span>
+          {visible.length} of {rows.length} queries
+        </span>
+      </div>
+      {visible.length ? (
+        <Table
+          headers={[
+            heading("Query"),
+            heading("Database"),
+            heading("Calls", "Calls"),
+            heading("Avg time", "MeanExecMS"),
+            heading("Total runtime", "TotalExecMS"),
+            heading("Impact", "ImpactScore"),
+          ]}
+          numeric={[2, 3, 4, 5]}
+          rows={visible.map((query) => [
+            <code className="query-text" title={query.Query}>
+              {query.Query}
+            </code>,
+            <code>{query.Database}</code>,
+            fmt(query.Calls),
+            `${fmt(query.MeanExecMS)} ms`,
+            `${fmt(query.TotalExecMS)} ms`,
+            <span className="impact-cell">
+              <i
+                style={{
+                  width: `${Math.min(100, Math.max(2, query.ImpactScore))}%`,
+                }}
+              />
+              {query.ImpactScore.toFixed(1)}
+            </span>,
+          ])}
+        />
+      ) : (
+        <Empty
+          title="No matching queries"
+          detail="No collected query text matches this search."
+        />
+      )}
+    </>
   );
 }
 function ReplicationView({ value }: { value: ReplicationStats }) {
@@ -433,7 +628,7 @@ function Table({
   rows,
   numeric = [],
 }: {
-  headers: string[];
+  headers: ReactNode[];
   rows: ReactNode[][];
   numeric?: number[];
 }) {
@@ -445,7 +640,7 @@ function Table({
             {headers.map((header, index) => (
               <th
                 className={numeric.includes(index) ? "numeric" : ""}
-                key={header}
+                key={index}
               >
                 {header}
               </th>

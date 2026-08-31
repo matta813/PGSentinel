@@ -248,13 +248,17 @@ func TestFindingFiltersCanBeCombined(t *testing.T) {
 	if err := s.UpsertFindings(ctx, "s", findings); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.FilterFindings(ctx, FindingFilter{Status: "active", Severity: "HIGH", Category: "vacuum", Search: "warehouse"})
+	got, err := s.FilterFindings(ctx, FindingFilter{Status: "active", Database: "warehouse", Severity: "HIGH", Category: "vacuum", Search: "warehouse"})
 	if err != nil || len(got) != 1 || got[0].ID != "vacuum" {
 		t.Fatalf("combined filter=%#v err=%v", got, err)
 	}
 	got, err = s.FilterFindings(ctx, FindingFilter{Search: "POOL IS EXHAUSTED"})
 	if err != nil || len(got) != 1 || got[0].ID != "connection" {
 		t.Fatalf("case-insensitive search=%#v err=%v", got, err)
+	}
+	got, err = s.FilterFindings(ctx, FindingFilter{Database: "missing"})
+	if err != nil || len(got) != 0 {
+		t.Fatalf("database filter=%#v err=%v", got, err)
 	}
 }
 

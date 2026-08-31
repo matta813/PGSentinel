@@ -58,7 +58,7 @@ func (a *API) metricHistory(w http.ResponseWriter, r *http.Request) {
 func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 	filter := storage.FindingFilter{
 		Status: r.URL.Query().Get("status"), ServerID: r.URL.Query().Get("serverId"),
-		Severity: strings.ToUpper(r.URL.Query().Get("severity")), Category: strings.TrimSpace(r.URL.Query().Get("category")), Search: strings.TrimSpace(r.URL.Query().Get("search")),
+		Database: strings.TrimSpace(r.URL.Query().Get("database")), Severity: strings.ToUpper(r.URL.Query().Get("severity")), Category: strings.TrimSpace(r.URL.Query().Get("category")), Search: strings.TrimSpace(r.URL.Query().Get("search")),
 	}
 	if filter.Status == "all" {
 		filter.Status = ""
@@ -76,6 +76,10 @@ func (a *API) listProblems(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(filter.Search) > 200 {
 		failure(w, 422, "Search text is too long", nil)
+		return
+	}
+	if len(filter.Database) > 100 {
+		failure(w, 422, "Database name is too long", nil)
 		return
 	}
 	items, err := a.store.FilterFindings(r.Context(), filter)
@@ -153,7 +157,8 @@ func (a *API) overview(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score})
+	freshness, _ := a.store.ListAllCollectionResources(r.Context(), time.Now())
+	write(w, 200, map[string]any{"servers": servers, "problems": findings, "counts": counts, "score": score, "freshness": freshness})
 }
 func (a *API) serverFreshness(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
