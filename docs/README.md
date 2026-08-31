@@ -9,6 +9,7 @@
 - [Operator controls](operator-controls.md): maintenance windows, suppressions, and scoped thresholds
 - [Audit log](audit-log.md): recorded actions, secret boundaries, search, and retention
 - [Diagnostic bundles](diagnostic-bundles.md): bounded, redacted support exports and their remaining metadata
+- [Change history](change-history.md): deployment markers, detected configuration changes, and query-regression correlation
 - [Access control](access-control.md): administrator, operator, and viewer permissions
 - [Metric retention](metric-retention.md): local aggregation tiers, sizing, configuration, and upgrades
 - [Incident correlation](incidents.md): conservative grouping, lifecycle timelines, and API

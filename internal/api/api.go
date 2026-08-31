@@ -88,6 +88,9 @@ func (a *API) routes() {
 	a.mux.HandleFunc("POST /api/v1/threshold-overrides", a.createThresholdOverride)
 	a.mux.HandleFunc("DELETE /api/v1/threshold-overrides/{id}", a.deleteThresholdOverride)
 	a.mux.HandleFunc("GET /api/v1/audit-events", a.listAuditEvents)
+	a.mux.HandleFunc("GET /api/v1/change-events", a.listChangeEvents)
+	a.mux.HandleFunc("POST /api/v1/deployments", a.createDeploymentEvent)
+	a.mux.HandleFunc("DELETE /api/v1/deployments/{id}", a.deleteDeploymentEvent)
 	a.mux.HandleFunc("GET /api/v1/diagnostic-bundle", a.diagnosticBundle)
 	a.mux.HandleFunc("GET /api/v1/servers/{id}/{resource}", a.serverResource)
 }

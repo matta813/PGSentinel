@@ -23,7 +23,7 @@ func queryMap(sample []models.QueryStat) map[queryKey]models.QueryStat {
 
 // QueryRegressionFindings compares reset-aware interval deltas. A finding needs
 // six compatible baseline intervals and two consecutive anomalous intervals.
-func QueryRegressionFindings(serverID string, history []models.QueryObservation, current models.QueryObservation) []models.Finding {
+func QueryRegressionFindings(serverID string, history []models.QueryObservation, current models.QueryObservation, changeHistory ...[]models.ChangeEvent) []models.Finding {
 	if len(history) < 8 {
 		return nil
 	}
@@ -75,6 +75,22 @@ func QueryRegressionFindings(serverID string, history []models.QueryObservation,
 		finding.Suggestions = []models.Suggestion{
 			{Title: "Correlate the regression window", Detail: "Compare deployments, parameter changes, data growth, cache pressure, call volume and row volume during the displayed windows."},
 			{Title: "Inspect a safe plan separately", Detail: "Use guarded read-only EXPLAIN only after reviewing the captured statement and parameters. PGSentinel never runs EXPLAIN ANALYZE automatically."},
+		}
+		if len(changeHistory) > 0 {
+			matched := 0
+			for _, event := range changeHistory[0] {
+				if event.OccurredAt.Before(previous.start) || event.OccurredAt.After(latest.end) {
+					continue
+				}
+				finding.Evidence = append(finding.Evidence, models.Evidence{Label: "Correlated change", Value: fmt.Sprintf("%s at %s: %s", event.Kind, event.OccurredAt.UTC().Format(time.RFC3339), event.Summary)})
+				matched++
+				if matched == 5 {
+					break
+				}
+			}
+			if matched > 0 {
+				finding.Confidence = models.ConfidenceMedium
+			}
 		}
 		out = append(out, finding)
 	}

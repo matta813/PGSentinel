@@ -40,6 +40,22 @@ func TestQueryRegressionRequiresPersistentResetAwareSignal(t *testing.T) {
 	}
 }
 
+func TestQueryRegressionIncludesChangesInsideRegressionWindow(t *testing.T) {
+	history, current := regressionSeries([]float64{10, 10, 10, 10, 10, 10, 10, 30, 32}, []float64{100, 120, 100, 110, 130, 100, 100, 80, 85})
+	changes := []models.ChangeEvent{{Kind: "deployment", Summary: "release checkout 2.4", OccurredAt: current.CollectedAt.Add(-30 * time.Second)}, {Kind: "configuration", Summary: "too early", OccurredAt: history[0].CollectedAt}}
+	got := QueryRegressionFindings("server", history, current, changes)
+	if len(got) != 1 {
+		t.Fatalf("findings=%#v", got)
+	}
+	evidence := ""
+	for _, item := range got[0].Evidence {
+		evidence += item.Label + ":" + item.Value + "\n"
+	}
+	if !strings.Contains(evidence, "Correlated change:deployment") || !strings.Contains(evidence, "release checkout 2.4") || strings.Contains(evidence, "too early") {
+		t.Fatalf("evidence=%s", evidence)
+	}
+}
+
 func TestQueryRegressionRejectsResetRestartAndSingleSpike(t *testing.T) {
 	means := []float64{10, 10, 10, 10, 10, 10, 10, 10, 35}
 	calls := []float64{100, 100, 100, 100, 100, 100, 100, 100, 100}
