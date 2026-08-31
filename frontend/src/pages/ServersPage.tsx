@@ -10,6 +10,7 @@ import {
 import { Notice, PageHeader } from "../components/UI";
 import { useApi } from "../hooks/useApi";
 import type { Server } from "../types";
+import { useMonitoring } from "../context/MonitoringContext";
 
 const initial = {
   name: "",
@@ -21,6 +22,7 @@ const initial = {
   tags: [] as string[],
 };
 export function ServersPage() {
+  const monitoring = useMonitoring();
   const { data, error, loading, reload } = useApi(
     () => api.get<Server[]>("/servers"),
     [],
@@ -29,6 +31,9 @@ export function ServersPage() {
   const [editingID, setEditingID] = useState("");
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
+  async function reloadServerLists() {
+    await Promise.all([reload(), monitoring.reloadServers()]);
+  }
   function closeForm() {
     setForm(initial);
     setEditingID("");
@@ -54,7 +59,7 @@ export function ServersPage() {
       if (editingID) await api.put(`/servers/${editingID}`, form);
       else await api.post("/servers", form);
       closeForm();
-      void reload();
+      await reloadServerLists();
     } catch (reason) {
       setMessage(
         reason instanceof APIError
@@ -68,7 +73,7 @@ export function ServersPage() {
     try {
       const value = await api.post<{ version: string }>(`/servers/${id}/test`);
       setMessage(`Connected to PostgreSQL ${value.version}`);
-      void reload();
+      await reloadServerLists();
     } catch (reason) {
       setMessage(
         reason instanceof APIError
@@ -322,7 +327,7 @@ export function ServersPage() {
                         onClick={async () => {
                           if (confirm(`Delete ${server.name}?`)) {
                             await api.delete(`/servers/${server.id}`);
-                            void reload();
+                            await reloadServerLists();
                           }
                         }}
                       >

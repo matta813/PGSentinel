@@ -573,6 +573,13 @@
 .status-panel.danger strong {
   color: var(--danger);
 }
+.status-panel.warning {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border-default));
+  background: color-mix(in srgb, var(--warning) 5%, var(--surface-1));
+}
+.status-panel.warning strong {
+  color: var(--warning);
+}
 .table-context + .kpi-grid,
 .freshness-notice + .table-context + .kpi-grid {
   margin-bottom: 14px;

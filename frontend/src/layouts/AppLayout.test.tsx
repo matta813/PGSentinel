@@ -13,6 +13,60 @@ import { MonitoringProvider } from "../context/MonitoringContext";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+test("distinguishes a failed server list from a successful empty estate and retries", async () => {
+  const store = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => store.set(key, value),
+    removeItem: (key: string) => store.delete(key),
+  });
+  let serverAttempts = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.endsWith("/servers")) {
+      serverAttempts += 1;
+      if (serverAttempts === 1)
+        return new Response(JSON.stringify({ error: "Unavailable" }), {
+          status: 503,
+        });
+      return new Response(JSON.stringify([]), { status: 200 });
+    }
+    return new Response(JSON.stringify({ version: "0.7.0", commit: "test" }), {
+      status: 200,
+    });
+  });
+  render(
+    <MemoryRouter initialEntries={["/queries"]}>
+      <MonitoringProvider>
+        <Routes>
+          <Route
+            element={
+              <AppLayout
+                username="admin"
+                role="administrator"
+                onLogout={() => undefined}
+              />
+            }
+          >
+            <Route path="queries" element={<p>Queries</p>} />
+          </Route>
+        </Routes>
+      </MonitoringProvider>
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByText("Server list unavailable"),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("No server configured")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("combobox", { name: "Global server" }),
+  ).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Retry server list" }));
+  expect(await screen.findByText("No server configured")).toBeInTheDocument();
+  expect(screen.queryByText("Server list unavailable")).not.toBeInTheDocument();
 });
 
 test("loads build metadata without using a stale cached version", async () => {

@@ -12,6 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function Harness() {
@@ -27,6 +28,7 @@ function Harness() {
       </span>
       {context.databasesLoading && <span>loading databases</span>}
       {context.databasesError && <span>database unavailable</span>}
+      {context.serversError && <span>server unavailable</span>}
       <button onClick={() => context.setSelectedServerId("secondary")}>
         Secondary
       </button>
@@ -34,7 +36,12 @@ function Harness() {
         Payments
       </button>
       <button onClick={() => context.setTimeRange("7d")}>Seven days</button>
-      <button onClick={() => void context.reloadDatabases()}>Retry</button>
+      <button onClick={() => void context.reloadDatabases()}>
+        Retry databases
+      </button>
+      <button onClick={() => void context.reloadServers()}>
+        Retry servers
+      </button>
     </>
   );
 }
@@ -156,9 +163,96 @@ test("exposes database loading failures and can retry them", async () => {
     </MemoryRouter>,
   );
   expect(await screen.findByText("database unavailable")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  fireEvent.click(screen.getByRole("button", { name: "Retry databases" }));
   await waitFor(() =>
     expect(screen.getByTestId("database-list")).toHaveTextContent("recovered"),
   );
   expect(screen.queryByText("database unavailable")).not.toBeInTheDocument();
+});
+
+test("exposes server loading failures and recovers through reloadServers", async () => {
+  let serverAttempts = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (!String(input).endsWith("/servers"))
+      return new Response(JSON.stringify({ databases: [] }), { status: 200 });
+    serverAttempts += 1;
+    return serverAttempts === 1
+      ? new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 })
+      : new Response(
+          JSON.stringify([{ id: "primary", name: "Primary", tags: [] }]),
+          { status: 200 },
+        );
+  });
+  render(
+    <MemoryRouter initialEntries={["/queries"]}>
+      <MonitoringProvider>
+        <Harness />
+      </MonitoringProvider>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("server unavailable")).toBeInTheDocument();
+  expect(screen.getByTestId("selected-server")).toBeEmptyDOMElement();
+  fireEvent.click(screen.getByRole("button", { name: "Retry servers" }));
+  expect(await screen.findByText("Primary")).toBeInTheDocument();
+  expect(screen.queryByText("server unavailable")).not.toBeInTheDocument();
+});
+
+test("removes a deleted persisted server and safely falls back without leaking its database", async () => {
+  const values = new Map([
+    ["monitoring.server", "primary"],
+    ["monitoring.database.primary", "payments"],
+    ["monitoring.database.secondary", "analytics"],
+  ]);
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  });
+  let serverLoads = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.endsWith("/servers")) {
+      serverLoads += 1;
+      return new Response(
+        JSON.stringify(
+          serverLoads === 1
+            ? [
+                { id: "primary", name: "Primary", tags: [] },
+                { id: "secondary", name: "Secondary", tags: [] },
+              ]
+            : [{ id: "secondary", name: "Secondary", tags: [] }],
+        ),
+        { status: 200 },
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        databases: [
+          { Name: url.includes("secondary") ? "analytics" : "payments" },
+        ],
+      }),
+      { status: 200 },
+    );
+  });
+  render(
+    <MemoryRouter initialEntries={["/queries"]}>
+      <MonitoringProvider>
+        <Harness />
+      </MonitoringProvider>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("Primary")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByTestId("selected-database")).toHaveTextContent(
+      "payments",
+    ),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Retry servers" }));
+  expect(await screen.findByText("Secondary")).toBeInTheDocument();
+  await waitFor(() => {
+    expect(values.get("monitoring.server")).toBe("secondary");
+    expect(screen.getByTestId("selected-database")).toHaveTextContent(
+      "analytics",
+    );
+  });
 });

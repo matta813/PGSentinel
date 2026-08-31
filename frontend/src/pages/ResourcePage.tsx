@@ -77,6 +77,13 @@ export function ResourcePage() {
   );
   if (monitoring.serversLoading || result.loading || freshness.loading)
     return <Loading />;
+  if (monitoring.serversError)
+    return (
+      <ErrorState
+        error={monitoring.serversError}
+        retry={monitoring.reloadServers}
+      />
+    );
   if (result.error || freshness.error)
     return (
       <ErrorState
@@ -129,6 +136,7 @@ export function ResourcePage() {
             resource={resource}
             data={result.data ?? []}
             database={monitoring.selectedDatabase}
+            quality={quality}
           />
           <ResourceTable
             resource={resource}
@@ -144,10 +152,12 @@ function ResourceSummary({
   resource,
   data,
   database,
+  quality,
 }: {
   resource: string;
   data: unknown;
   database: string;
+  quality?: CollectionResourceStatus;
 }) {
   if (!Array.isArray(data)) return null;
   const rows = data.filter(
@@ -198,6 +208,16 @@ function ResourceSummary({
   }
   if (resource === "locks") {
     const locks = rows as LockInfo[];
+    const hasFreshEvidence = quality?.state === "fresh";
+    if (!locks.length && !hasFreshEvidence)
+      return (
+        <div className="status-panel warning">
+          <strong>No current lock evidence available</strong>
+          <span>
+            A fresh lock snapshot is required before blocking can be ruled out.
+          </span>
+        </div>
+      );
     return (
       <div className={`status-panel ${locks.length ? "danger" : "success"}`}>
         <strong>

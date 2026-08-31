@@ -199,24 +199,23 @@ export function AppLayout({
           </div>
           {showsServer && (
             <div className="context-controls">
-              <label className="context-selector server-context">
+              <label
+                className={`context-selector server-context ${monitoring.serversError ? "context-error" : ""}`}
+              >
                 <span
                   className={`server-dot ${monitoring.selectedServer?.status?.toLowerCase() ?? "unknown"}`}
                 />
                 <span className="context-copy">
                   <small>Server</small>
-                  <strong>
-                    {monitoring.selectedServer?.name ??
-                      (monitoring.serversLoading
-                        ? "Loading servers…"
-                        : "No server configured")}
-                  </strong>
+                  <strong>{serverContextLabel(monitoring)}</strong>
                 </span>
                 <select
                   aria-label="Global server"
                   value={monitoring.selectedServerId}
                   disabled={
-                    monitoring.serversLoading || !monitoring.servers.length
+                    monitoring.serversLoading ||
+                    !monitoring.servers.length ||
+                    Boolean(monitoring.serversError)
                   }
                   onChange={(event) =>
                     monitoring.setSelectedServerId(event.target.value)
@@ -230,6 +229,16 @@ export function AppLayout({
                 </select>
                 <ChevronsUpDown />
               </label>
+              {monitoring.serversError && (
+                <button
+                  className="icon-button context-retry"
+                  aria-label="Retry server list"
+                  title="Retry server list"
+                  onClick={() => void monitoring.reloadServers()}
+                >
+                  <RefreshCw />
+                </button>
+              )}
               {showsDatabase && (
                 <>
                   <label
@@ -244,6 +253,9 @@ export function AppLayout({
                       aria-label="Global database"
                       value={monitoring.selectedDatabase}
                       disabled={
+                        monitoring.serversLoading ||
+                        Boolean(monitoring.serversError) ||
+                        !monitoring.selectedServerId ||
                         monitoring.databasesLoading ||
                         Boolean(monitoring.databasesError) ||
                         !monitoring.databases.length
@@ -306,8 +318,17 @@ export function AppLayout({
 }
 
 function databaseContextLabel(monitoring: ReturnType<typeof useMonitoring>) {
+  if (monitoring.serversLoading) return "Waiting for server list…";
+  if (monitoring.serversError) return "Database list unavailable";
+  if (!monitoring.selectedServerId) return "No server selected";
   if (monitoring.databasesLoading) return "Loading databases…";
   if (monitoring.databasesError) return "Database list unavailable";
   if (!monitoring.databases.length) return "No databases collected";
   return monitoring.selectedDatabase || "All databases";
+}
+
+function serverContextLabel(monitoring: ReturnType<typeof useMonitoring>) {
+  if (monitoring.serversLoading) return "Loading servers…";
+  if (monitoring.serversError) return "Server list unavailable";
+  return monitoring.selectedServer?.name || "No server configured";
 }

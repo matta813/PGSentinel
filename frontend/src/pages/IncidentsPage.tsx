@@ -1,5 +1,5 @@
 import { ArrowRight, Clock3, Link2, ListTree } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import {
@@ -21,6 +21,18 @@ export function IncidentsPage() {
   );
   const selected = params.get("id");
   const monitoring = useMonitoring();
+  const previousServerId = useRef(monitoring.selectedServerId);
+  useEffect(() => {
+    const previous = previousServerId.current;
+    previousServerId.current = monitoring.selectedServerId;
+    if (!previous || previous === monitoring.selectedServerId) return;
+    const next = new URLSearchParams(params);
+    next.delete("id");
+    if (monitoring.selectedServerId)
+      next.set("serverId", monitoring.selectedServerId);
+    else next.delete("serverId");
+    setParams(next, { replace: true });
+  }, [monitoring.selectedServerId, params, setParams]);
   const incidentQuery = new URLSearchParams({ status, limit: "50" });
   if (monitoring.selectedServerId)
     incidentQuery.set("serverId", monitoring.selectedServerId);
@@ -132,7 +144,8 @@ export function IncidentsPage() {
               ) : detailError ? (
                 <ErrorState error={detailError} />
               ) : (
-                detail && (
+                detail &&
+                detail.serverId === monitoring.selectedServerId && (
                   <IncidentDetail
                     incident={detail}
                     serverName={names.get(detail.serverId)}

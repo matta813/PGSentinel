@@ -160,12 +160,24 @@ try {
     deviceScaleFactor: 1,
   });
   await page.clock.install({ time: new Date(now) });
-  page.on("pageerror", (error) =>
-    console.error(`Browser error: ${error.message}`),
-  );
+  const browserErrors = [];
+  let serverListUnavailable = false;
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && !serverListUnavailable)
+      browserErrors.push(message.text());
+  });
   await page.addInitScript(() => localStorage.setItem("theme", "light"));
   await page.route("**/api/v1/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+    if (serverListUnavailable && pathname === "/api/v1/servers") {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Server list temporarily unavailable" }),
+      });
+      return;
+    }
     const resource = pathname.split("/").at(-1);
     const resourceBodies = {
       databases: {
@@ -531,6 +543,14 @@ try {
       fullPage: true,
     });
   }
+  serverListUnavailable = true;
+  await page.goto(`${baseURL}/queries`, { waitUntil: "networkidle" });
+  await page.screenshot({
+    path: path.join(outputDir, "pgsentinel-server-list-unavailable.png"),
+    fullPage: true,
+  });
+  serverListUnavailable = false;
+  await page.goto(`${baseURL}/settings`, { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Switch to dark theme" }).click();
   await page.screenshot({
     path: path.join(outputDir, "pgsentinel-settings-dark.png"),
@@ -566,6 +586,8 @@ try {
     path: path.join(outputDir, "pgsentinel-social-preview.png"),
   });
   await browser.close();
+  if (browserErrors.length)
+    throw new Error(`Browser errors:\n${browserErrors.join("\n")}`);
 } finally {
   vite.kill("SIGTERM");
 }

@@ -16,6 +16,8 @@ export type TimeRange = "1h" | "6h" | "24h" | "7d" | "30d";
 interface MonitoringContextValue {
   servers: Server[];
   serversLoading: boolean;
+  serversError?: Error;
+  reloadServers: () => Promise<void>;
   selectedServerId: string;
   setSelectedServerId: (id: string) => void;
   selectedServer?: Server;
@@ -47,7 +49,7 @@ const databaseRoutes = new Set([
 export function MonitoringProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const databaseScopeEnabled = databaseRoutes.has(pathname);
-  const servers = useApi(() => api.get<Server[]>("/servers"), []);
+  const serverResult = useApi(() => api.get<Server[]>("/servers"), []);
   const [selectedServerId, setSelectedServerIdState] = useState(
     () => storage()?.getItem("monitoring.server") ?? "",
   );
@@ -64,11 +66,11 @@ export function MonitoringProvider({ children }: { children: ReactNode }) {
   const [timeRange, setTimeRangeState] = useState<TimeRange>(() =>
     safeRange(storage()?.getItem("monitoring.range") ?? null),
   );
-  const effectiveServerId = servers.data?.some(
+  const effectiveServerId = serverResult.data?.some(
     (server) => server.id === selectedServerId,
   )
     ? selectedServerId
-    : (servers.data?.[0]?.id ?? "");
+    : (serverResult.data?.[0]?.id ?? "");
   const databaseResult = useApi(
     () =>
       databaseScopeEnabled && effectiveServerId
@@ -84,7 +86,9 @@ export function MonitoringProvider({ children }: { children: ReactNode }) {
   const requestedDatabase =
     databaseSelection.serverId === effectiveServerId
       ? databaseSelection.database
-      : "";
+      : effectiveServerId
+        ? (storage()?.getItem(`monitoring.database.${effectiveServerId}`) ?? "")
+        : "";
   const effectiveDatabase = databases.some(
     (database) => database.Name === requestedDatabase,
   )
@@ -92,14 +96,20 @@ export function MonitoringProvider({ children }: { children: ReactNode }) {
     : "";
 
   useEffect(() => {
-    if (effectiveServerId)
+    if (serverResult.loading || serverResult.error) return;
+    if (effectiveServerId) {
       storage()?.setItem("monitoring.server", effectiveServerId);
-  }, [effectiveServerId]);
+    } else {
+      storage()?.removeItem("monitoring.server");
+    }
+  }, [effectiveServerId, serverResult.error, serverResult.loading]);
 
   const value = useMemo<MonitoringContextValue>(
     () => ({
-      servers: servers.data ?? [],
-      serversLoading: servers.loading,
+      servers: serverResult.data ?? [],
+      serversLoading: serverResult.loading,
+      serversError: serverResult.error,
+      reloadServers: serverResult.reload,
       selectedServerId: effectiveServerId,
       setSelectedServerId: (id) => {
         setSelectedServerIdState(id);
@@ -109,7 +119,7 @@ export function MonitoringProvider({ children }: { children: ReactNode }) {
         });
         storage()?.setItem("monitoring.server", id);
       },
-      selectedServer: servers.data?.find(
+      selectedServer: serverResult.data?.find(
         (server) => server.id === effectiveServerId,
       ),
       databases,
@@ -134,8 +144,10 @@ export function MonitoringProvider({ children }: { children: ReactNode }) {
       },
     }),
     [
-      servers.data,
-      servers.loading,
+      serverResult.data,
+      serverResult.loading,
+      serverResult.error,
+      serverResult.reload,
       effectiveServerId,
       databases,
       databaseResult.loading,
