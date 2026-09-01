@@ -28,18 +28,67 @@ This roadmap reflects the shipped repository and recent commit history. Items ar
 
 ## Now
 
+### Wait Event Intelligence
+
+- Collect current PostgreSQL-native wait evidence from `pg_stat_activity`, including `wait_event_type`, `wait_event`, `state`, `query_start`, `xact_start`, and `backend_type` where available.
+- Expose current wait activity and conservatively aggregate the wait classes PostgreSQL reports, including Lock, IO, LWLock, Client, IPC, Timeout, and categories introduced by supported PostgreSQL versions.
+- Show which wait classes dominate active pressure while retaining source provenance and collection freshness.
+- Produce findings only when evidence is sufficient, and connect wait evidence with existing lock, query, and problem data only when the relationship is safe to make.
+- Treat correlation as investigation context, never proof of causation.
+- Add a **Wait Events** view under **Performance**, alongside Query Performance, Tables, Index Analysis, Vacuum, and Locks.
+
 ### Expand notification delivery
 
-- Add more notification providers while preserving bounded retries and redacted errors.
+- Add Slack, Discord, Microsoft Teams, and SMTP/email providers through the existing notification architecture.
+- Reuse routing; severity, category, server, and tag filters; cooldowns; retries; bounded retry history; redacted errors; encrypted secrets; and SSRF protections where applicable.
+- Keep provider-specific transport details behind shared delivery contracts rather than duplicating routing or lifecycle behavior.
 
 ## Next
 
-- Explicit, guarded `EXPLAIN (FORMAT JSON)` support for safe read-only statements.
+### PostgreSQL Activity Explorer
+
+- Add a read-only `pg_stat_activity` explorer for PID, database, user, application, client address, backend type, state, query and transaction timing, state changes, wait class/event, and bounded current query text where available.
+- Support focused filtering by database, user, application, backend type, state, wait type, and runtime.
+- Remain evidence- and investigation-oriented: do not add controls to cancel queries, terminate backends, or kill sessions.
+
+### Guarded Query Plan Inspector
+
+- Support `EXPLAIN (FORMAT JSON)` only for safely validated read-only statements.
+- Inspect estimates and plan structure such as sequential and index scans, estimated row counts, costs, nested loops, sorts, hashes, and plan depth.
+- Keep advice cautious and evidence-based, and never run automatic `EXPLAIN ANALYZE`, because it executes the statement.
+
+### Database Growth & Capacity Intelligence
+
+- Retain real measurements for current and historical database size, daily and weekly growth, 30-day change, and table and index growth.
+- Offer conservative linear projections toward configured capacity thresholds, described as: **“Linear estimate based on recent observed growth.”**
+- Never claim that a disk will be full in a given number of days without explicit, trusted host-filesystem capacity evidence.
 
 ## Later exploration
 
-- Optional agent-assisted host metrics with clear provenance.
-- Import/export of reviewed rule profiles and redacted troubleshooting data.
+### OIDC / SSO
+
+- Add generic OpenID Connect authentication compatible with Authentik, Keycloak, Microsoft Entra ID, Okta, and standards-compliant providers, without necessarily removing local authentication.
+- Allow explicit claim/group mapping to administrator, operator, and viewer roles.
+- Require strict issuer validation, state and nonce validation, PKCE where applicable, secure callbacks, safe account linking, an explicit local-administrator recovery path, and no silent privilege escalation.
+
+### PgBouncer Monitoring
+
+- Add optional visibility into pools; client, server, active, idle, and waiting connections; maximum wait; utilization; pooling mode; and database/user pools.
+- Consider evidence-driven findings for waiting-client growth, saturated pools, sustained pressure, and abnormal wait duration.
+- Label provenance explicitly as **PgBouncer evidence** and never present it as PostgreSQL server evidence.
+
+### Schema Change Timeline
+
+- Observe relevant index, table, PostgreSQL configuration, and extension changes when they can be detected safely, and correlate them with deployment events already recorded by PGSentinel.
+- Help operators answer “What changed before this finding started?” without promising complete DDL auditing unless explicit evidence supports it.
+
+### Optional host metrics
+
+- Add optional agent-assisted host metrics with explicit provenance and a clear separation from PostgreSQL-native evidence.
+
+### Portable operational configuration
+
+- Continue import/export work for reviewed rule profiles and bounded, redacted troubleshooting data without exporting secrets.
 
 ## Delivery requirements
 
