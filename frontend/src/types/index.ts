@@ -144,3 +144,21 @@ export interface LockInfo {
   Query: string;
   BlockingQuery: string;
 }
+export interface WaitEventSample {
+  PID: number;
+  Database: string;
+  User: string;
+  Application: string;
+  ClientAddress: string;
+  BackendType: string;
+  State: string;
+  WaitEventType: string;
+  WaitEvent: string;
+  Query: string;
+  QueryStartedAt?: string;
+  TransactionStartedAt?: string;
+  StateChangedAt?: string;
+  QueryAgeSeconds: number;
+  TransactionAgeSeconds: number;
+  StateAgeSeconds: number;
+}

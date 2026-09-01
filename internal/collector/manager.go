@@ -257,6 +257,22 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		_ = m.store.LatestSnapshot(ctx, server.ID, "queries", &snapshot.Queries)
 	}
 	if cycle&cycleFast != 0 {
+		waitEvents, waitEventErr := collector.CollectWaitEvents(ctx)
+		if waitEventErr == nil {
+			snapshot.WaitEvents = waitEvents
+			if saveErr := m.store.SaveSnapshot(ctx, server.ID, "wait-events", snapshot.WaitEvents, snapshot.CollectedAt); saveErr == nil {
+				m.recordFresh(ctx, server.ID, "wait-events", m.schedule.Fast, snapshot.CollectedAt)
+			} else {
+				m.log.Warn("save wait-event snapshot", "server_id", server.ID, "error", saveErr)
+				complete = false
+				m.recordUnavailable(ctx, server.ID, "wait-events", m.schedule.Fast, snapshot.CollectedAt)
+			}
+		} else {
+			m.log.Warn("collect wait events", "server_id", server.ID, "error", waitEventErr)
+			_ = m.restoreSnapshot(ctx, server.ID, "wait-events", &snapshot.WaitEvents)
+			complete = false
+			m.recordUnavailable(ctx, server.ID, "wait-events", m.schedule.Fast, snapshot.CollectedAt)
+		}
 		locks, lockErr := collector.CollectLocks(ctx)
 		if lockErr == nil {
 			snapshot.Locks = locks
@@ -269,6 +285,7 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			m.recordUnavailable(ctx, server.ID, "locks", m.schedule.Fast, snapshot.CollectedAt)
 		}
 	} else {
+		_ = m.store.LatestSnapshot(ctx, server.ID, "wait-events", &snapshot.WaitEvents)
 		_ = m.store.LatestSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
 	}
 	if cycle&cycleSlow != 0 {
@@ -384,6 +401,7 @@ func (m *Manager) recordCycleUnavailable(ctx context.Context, serverID string, c
 	}
 	if cycle&cycleFast != 0 {
 		m.recordUnavailable(ctx, serverID, "locks", m.schedule.Fast, now)
+		m.recordUnavailable(ctx, serverID, "wait-events", m.schedule.Fast, now)
 	}
 	if cycle&cycleStandard != 0 {
 		for _, resource := range []string{"queries", "replication", "wal"} {
