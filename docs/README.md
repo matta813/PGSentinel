@@ -3,7 +3,7 @@
 ## Operators
 
 - [Deployment](deployment.md): Compose, persistence, upgrades, backups, and hardening
-- [Monitoring user](monitoring-user.md): PostgreSQL roles, TLS, and `pg_stat_statements`
+- [Monitoring user](monitoring-user.md): PostgreSQL roles, TLS, wait-event visibility, and `pg_stat_statements`
 - [Health rules](health-rules.md): evidence, thresholds, confidence, and health scoring
 - [Notifications](notifications.md): destinations, routing rules, cooldowns, retries, and delivery history
 - [Operator controls](operator-controls.md): maintenance windows, suppressions, and scoped thresholds
