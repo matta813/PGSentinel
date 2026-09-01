@@ -55,7 +55,7 @@ Prefer to inspect scripts before running them? Follow the [review-first installa
 
 ### PostgreSQL visibility
 
-- Connections, transactions, databases, locks, tables, vacuum, indexes, and configuration
+- Connections, transactions, databases, locks, current PostgreSQL wait events, tables, vacuum, indexes, and configuration
 - Role-aware replication LSN gaps, slot retention growth, archive health, WAL rates, timelines, and checkpoint/restartpoint findings
 - Per-database table and index collection across a configurable number of databases
 - `pg_stat_statements` query load and multi-factor Query Impact Score
@@ -112,6 +112,10 @@ The Go service schedules read-only collection through `pgx`, persists snapshots 
 Each finding keeps the context needed for triage in one place instead of sending the operator across unrelated charts. The interface also includes query impact, table health, index analysis, vacuum progress, blocking locks, server management, and light/dark themes.
 
 The screenshots use synthetic demo data. Maintainers can reproduce them with the [documented screenshot workflow](docs/assets/README.md).
+
+![Current PostgreSQL wait classes, affected sessions, and query-age evidence](docs/assets/pgsentinel-wait-events.png)
+
+Wait Events reports what PostgreSQL says each backend is waiting on in the latest snapshot. It supports investigation, but a wait event by itself does not prove root cause or host resource saturation.
 
 ## PostgreSQL setup
 

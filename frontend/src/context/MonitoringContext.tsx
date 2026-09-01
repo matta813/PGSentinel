@@ -39,6 +39,7 @@ const safeRange = (value: string | null): TimeRange =>
 const storage = () => globalThis.localStorage;
 const databaseRoutes = new Set([
   "/queries",
+  "/wait-events",
   "/tables",
   "/indexes",
   "/vacuum",

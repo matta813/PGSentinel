@@ -1132,3 +1132,70 @@
 .table-context ~ .form-stack > .data-table:first-child {
   border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
+
+.wait-distribution {
+  margin: 0 0 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.wait-distribution .section-heading {
+  margin-bottom: 0.75rem;
+}
+
+.wait-distribution .section-heading div,
+.wait-distribution-row {
+  display: flex;
+  align-items: center;
+}
+
+.wait-distribution .section-heading div {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.wait-distribution .section-heading span,
+.wait-distribution-row > span:last-child {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.wait-distribution-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.7fr) minmax(8rem, 3fr) minmax(
+      6rem,
+      auto
+    );
+  gap: 0.8rem;
+  min-height: 2rem;
+}
+
+.wait-bar {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+}
+
+.wait-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.wait-toolbar {
+  flex-wrap: wrap;
+}
+
+.wait-toolbar select {
+  min-height: 2.25rem;
+  padding: 0 2rem 0 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+}
