@@ -248,6 +248,7 @@ type Snapshot struct {
 	Connections   ConnectionStats   `json:"connections"`
 	Databases     []DatabaseStat    `json:"databases"`
 	Locks         []LockInfo        `json:"locks"`
+	WaitEvents    []WaitEventSample `json:"waitEvents"`
 	Queries       []QueryStat       `json:"queries"`
 	Tables        []TableStat       `json:"tables"`
 	Indexes       []IndexStat       `json:"indexes"`
@@ -314,6 +315,13 @@ type LockInfo struct {
 	BlockedPID, BlockingPID                           int
 	DurationSeconds                                   float64
 	Database, User, Application, Query, BlockingQuery string
+}
+type WaitEventSample struct {
+	PID                                                     int        `json:"PID"`
+	Database, User, Application, ClientAddress              string     `json:",omitempty"`
+	BackendType, State, WaitEventType, WaitEvent, Query     string     `json:",omitempty"`
+	QueryStartedAt, TransactionStartedAt, StateChangedAt    *time.Time `json:",omitempty"`
+	QueryAgeSeconds, TransactionAgeSeconds, StateAgeSeconds float64    `json:",omitempty"`
 }
 type QueryStat struct {
 	QueryID, Database, Query                                                                                                        string

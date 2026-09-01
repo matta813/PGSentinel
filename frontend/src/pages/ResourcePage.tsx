@@ -12,6 +12,7 @@ import type {
   CollectionResourceStatus,
   QueryStat,
   TableStat,
+  WaitEventSample,
 } from "../types";
 import type { ReplicationStats, WALStats } from "../types/replication";
 
@@ -40,6 +41,11 @@ const titles: Record<string, [string, string, string]> = {
     "Locks",
     "Locks",
     "Current blocked sessions, their blockers, and blocking duration.",
+  ],
+  "wait-events": [
+    "Wait Events",
+    "Current waits",
+    "Current PostgreSQL sessions waiting on locks, I/O, internal synchronization, clients, and other backend resources.",
   ],
   replication: [
     "Replication intelligence",
@@ -106,7 +112,11 @@ export function ResourcePage() {
         title={title[0]}
         description={title[2]}
         meta={
-          resource === "queries" ? "Latest collected query snapshot" : undefined
+          resource === "queries"
+            ? "Latest collected query snapshot"
+            : resource === "wait-events"
+              ? "Current evidence · Latest snapshot"
+              : undefined
         }
       />
       {selected && (
@@ -233,6 +243,73 @@ function ResourceSummary({
       </div>
     );
   }
+  if (resource === "wait-events") {
+    const waits = rows as WaitEventSample[];
+    const hasFreshEvidence = quality?.state === "fresh";
+    if (!waits.length && !hasFreshEvidence)
+      return (
+        <div className="status-panel warning">
+          <strong>Current wait state unavailable</strong>
+          <span>
+            A fresh wait-event snapshot is required before current waits can be
+            ruled out.
+          </span>
+        </div>
+      );
+    if (!waits.length)
+      return (
+        <div className="status-panel success">
+          <strong>
+            No sessions are currently reporting a PostgreSQL wait event.
+          </strong>
+          <span>The latest wait-event snapshot is fresh.</span>
+        </div>
+      );
+    const databases = new Set(
+      waits.map((wait) => wait.Database).filter(Boolean),
+    );
+    const classes = waitClassCounts(waits);
+    const top = classes[0];
+    return (
+      <>
+        <KPIGrid>
+          <KPI label="Waiting sessions" value={waits.length} tone="warning" />
+          <KPI label="Affected databases" value={databases.size} />
+          <KPI label="Top wait class" value={top?.name ?? "—"} />
+          <KPI
+            label="Longest query age"
+            value={duration(
+              Math.floor(
+                Math.max(...waits.map((wait) => wait.QueryAgeSeconds || 0)),
+              ),
+            )}
+          />
+        </KPIGrid>
+        <section
+          className="wait-distribution"
+          aria-label="Wait class distribution"
+        >
+          <div className="section-heading">
+            <div>
+              <strong>Wait class distribution</strong>
+              <span>Exact share of sessions in this latest snapshot.</span>
+            </div>
+          </div>
+          {classes.map((item) => (
+            <div className="wait-distribution-row" key={item.name}>
+              <strong>{item.name || "Unknown"}</strong>
+              <span className="wait-bar">
+                <i style={{ width: `${item.share}%` }} />
+              </span>
+              <span>
+                {item.count} · {item.share.toFixed(1)}%
+              </span>
+            </div>
+          ))}
+        </section>
+      </>
+    );
+  }
   return null;
 }
 function FreshnessNotice({ quality }: { quality?: CollectionResourceStatus }) {
@@ -292,6 +369,10 @@ function ResourceTable({
       />
     );
   if (resource === "locks" && rows.length === 0) return null;
+  if (resource === "wait-events") {
+    if (rows.length === 0) return null;
+    return <WaitEventsTable rows={rows as WaitEventSample[]} />;
+  }
   if (rows.length === 0)
     return (
       <Empty
@@ -404,8 +485,134 @@ function resourceLabel(resource: string) {
         indexes: "index",
         vacuum: "vacuum",
         locks: "lock",
+        "wait-events": "wait-event",
       } as Record<string, string>
     )[resource] ?? resource
+  );
+}
+
+function waitClassCounts(rows: WaitEventSample[]) {
+  const counts = new Map<string, number>();
+  rows.forEach((row) =>
+    counts.set(
+      row.WaitEventType || "Unknown",
+      (counts.get(row.WaitEventType || "Unknown") ?? 0) + 1,
+    ),
+  );
+  return [...counts.entries()]
+    .map(([name, count]) => ({
+      name,
+      count,
+      share: rows.length ? (count / rows.length) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function WaitEventsTable({ rows }: { rows: WaitEventSample[] }) {
+  const [search, setSearch] = useState("");
+  const [waitClass, setWaitClass] = useState("");
+  const [application, setApplication] = useState("");
+  const [state, setState] = useState("");
+  const values = (field: "WaitEventType" | "Application" | "State") =>
+    [...new Set(rows.map((row) => row[field]).filter(Boolean))].sort();
+  const visible = rows.filter(
+    (row) =>
+      (!waitClass || row.WaitEventType === waitClass) &&
+      (!application || row.Application === application) &&
+      (!state || row.State === state) &&
+      (!search ||
+        `${row.Query} ${row.WaitEvent} ${row.User} ${row.PID}`
+          .toLowerCase()
+          .includes(search.toLowerCase())),
+  );
+  return (
+    <>
+      <div className="table-toolbar wait-toolbar">
+        <label className="search-field">
+          <Search />
+          <span className="sr-only">Search wait evidence</span>
+          <input
+            aria-label="Search wait evidence"
+            placeholder="Search query, event, user, or PID"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <select
+          aria-label="Filter wait class"
+          value={waitClass}
+          onChange={(event) => setWaitClass(event.target.value)}
+        >
+          <option value="">All wait classes</option>
+          {values("WaitEventType").map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter application"
+          value={application}
+          onChange={(event) => setApplication(event.target.value)}
+        >
+          <option value="">All applications</option>
+          {values("Application").map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter state"
+          value={state}
+          onChange={(event) => setState(event.target.value)}
+        >
+          <option value="">All states</option>
+          {values("State").map((value) => (
+            <option key={value}>{value}</option>
+          ))}
+        </select>
+        <span>
+          {visible.length} of {rows.length} sessions
+        </span>
+      </div>
+      {visible.length ? (
+        <Table
+          headers={[
+            "Database",
+            "PID",
+            "User",
+            "Application",
+            "State",
+            "Wait class",
+            "Wait event",
+            "Query age",
+            "Transaction age",
+            "Query",
+          ]}
+          numeric={[1, 7, 8]}
+          rows={visible.map((wait) => [
+            wait.Database || "—",
+            <code>{wait.PID}</code>,
+            wait.User || "—",
+            wait.Application || "—",
+            wait.State || "—",
+            <span className="assessment warning">
+              {wait.WaitEventType || "Unknown"}
+            </span>,
+            wait.WaitEvent || "Unknown",
+            duration(Math.floor(wait.QueryAgeSeconds || 0)),
+            wait.TransactionStartedAt
+              ? duration(Math.floor(wait.TransactionAgeSeconds || 0))
+              : "—",
+            <code className="query-text" title={wait.Query}>
+              {wait.Query || "Query text unavailable"}
+            </code>,
+          ])}
+        />
+      ) : (
+        <Empty
+          title="No matching waits"
+          detail="No current wait evidence matches these filters."
+        />
+      )}
+    </>
   );
 }
 

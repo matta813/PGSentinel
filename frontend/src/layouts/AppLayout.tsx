@@ -18,6 +18,7 @@ import {
   Settings,
   Sun,
   Table2,
+  Timer,
   Users,
   Waves,
   X,
@@ -41,6 +42,7 @@ const groups = [
     label: "Performance",
     items: [
       ["/queries", "Query Performance", Search],
+      ["/wait-events", "Wait Events", Timer],
       ["/tables", "Tables", Table2],
       ["/indexes", "Index Analysis", KeyRound],
       ["/vacuum", "Vacuum", Activity],
@@ -62,6 +64,7 @@ const groups = [
 ] as const;
 const databaseRoutes = new Set([
   "/queries",
+  "/wait-events",
   "/tables",
   "/indexes",
   "/vacuum",

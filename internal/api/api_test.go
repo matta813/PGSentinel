@@ -562,7 +562,7 @@ func TestServerFreshnessReturnsFixedSafeResourceSet(t *testing.T) {
 	if err := json.Unmarshal(r.Body.Bytes(), &items); err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 10 || items[0]["state"] != "unavailable" || strings.Contains(r.Body.String(), "secret") {
+	if len(items) != 11 || items[0]["state"] != "unavailable" || !strings.Contains(r.Body.String(), `"resource":"wait-events"`) || strings.Contains(r.Body.String(), "secret") {
 		t.Fatalf("items=%#v", items)
 	}
 	for _, path := range []string{"/api/v1/servers/not-a-uuid/freshness", "/api/v1/servers/1b5c3f33-bfcb-4fd4-9c36-df76e2683ee5/freshness"} {
