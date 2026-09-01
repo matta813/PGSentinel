@@ -16,7 +16,7 @@ var historicalMetrics = map[string]bool{
 	"connections.waiting": true, "server.uptime_seconds": true,
 }
 
-var monitoredResources = []string{"connections", "locks", "database-statistics", "queries", "tables", "indexes", "vacuum", "replication", "wal", "configuration"}
+var monitoredResources = []string{"connections", "locks", "wait-events", "database-statistics", "queries", "tables", "indexes", "vacuum", "replication", "wal", "configuration"}
 
 func (a *API) metricHistory(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -222,6 +222,7 @@ func qualityForFinding(finding models.Finding, items []models.CollectionResource
 	resource := map[string]string{
 		"connection-utilization": "connections", "idle-in-transaction": "connections", "long-transaction": "connections",
 		"blocking-queries": "locks", "deadlocks": "database-statistics", "rollback-ratio": "database-statistics", "cache-hit": "database-statistics",
+		"wait-lock-pressure": "wait-events", "wait-class-concentration": "wait-events",
 		"dead-tuples": "vacuum", "vacuum-behind": "vacuum", "large-seq-scans": "tables", "stale-analyze": "tables",
 		"query-impact": "queries", "query-regression": "queries", "pgss-unavailable": "queries", "io-timing-disabled": "configuration",
 		"unused-index": "indexes", "duplicate-index": "indexes",
@@ -240,7 +241,7 @@ func qualityForFinding(finding models.Finding, items []models.CollectionResource
 
 func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 	id, resource := r.PathValue("id"), r.PathValue("resource")
-	allowed := map[string]string{"metrics": "core", "databases": "core", "connections": "core", "queries": "queries", "tables": "tables", "indexes": "indexes", "locks": "locks", "configuration": "configuration", "vacuum": "tables", "replication": "replication", "wal": "wal"}
+	allowed := map[string]string{"metrics": "core", "databases": "core", "connections": "core", "queries": "queries", "tables": "tables", "indexes": "indexes", "locks": "locks", "wait-events": "wait-events", "configuration": "configuration", "vacuum": "tables", "replication": "replication", "wal": "wal"}
 	kind, ok := allowed[resource]
 	if !ok {
 		failure(w, 404, "Resource not found", nil)
@@ -258,6 +259,8 @@ func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 		value = &[]models.IndexStat{}
 	case "locks":
 		value = &[]models.LockInfo{}
+	case "wait-events":
+		value = &[]models.WaitEventSample{}
 	case "configuration":
 		value = &map[string]string{}
 	case "replication":
