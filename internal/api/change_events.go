@@ -16,6 +16,13 @@ func (a *API) listChangeEvents(w http.ResponseWriter, r *http.Request) {
 		failure(w, http.StatusBadRequest, "Valid serverId is required", nil)
 		return
 	}
+	if _, err := a.store.GetServer(r.Context(), serverID, false); err == sql.ErrNoRows {
+		failure(w, http.StatusNotFound, "Server not found", nil)
+		return
+	} else if err != nil {
+		failure(w, http.StatusInternalServerError, "Unable to load server", err)
+		return
+	}
 	limit := 100
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)
