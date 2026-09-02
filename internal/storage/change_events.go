@@ -21,6 +21,9 @@ func (s *Store) RecordChangeEvent(ctx context.Context, event *models.ChangeEvent
 	if event.OccurredAt.IsZero() {
 		event.OccurredAt = time.Now().UTC()
 	}
+	if event.Details == nil {
+		event.Details = []string{}
+	}
 	event.CreatedAt = time.Now().UTC()
 	details, err := json.Marshal(event.Details)
 	if err != nil {
@@ -72,6 +75,9 @@ func (s *Store) ListChangeEvents(ctx context.Context, serverID string, from, to 
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(details), &event.Details)
+		if event.Details == nil {
+			event.Details = []string{}
+		}
 		event.OccurredAt, _ = time.Parse(time.RFC3339Nano, occurred)
 		event.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 		out = append(out, event)
