@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+func TestListChangeEventsRejectsMissingServer(t *testing.T) {
+	h := testAPI(t)
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/change-events?serverId=11111111-1111-4111-8111-111111111111", nil))
+	if r.Code != http.StatusNotFound {
+		t.Fatalf("missing server change events=%d %s", r.Code, r.Body.String())
+	}
+}
+
 func TestDeploymentChangeEventLifecycle(t *testing.T) {
 	h := testAPI(t)
 	response := httptest.NewRecorder()
