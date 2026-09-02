@@ -47,6 +47,13 @@ func (a *API) metricHistory(w http.ResponseWriter, r *http.Request) {
 		}
 		from = parsed
 	}
+	if _, err := a.store.GetServer(r.Context(), id, false); err == sql.ErrNoRows {
+		failure(w, http.StatusNotFound, "Server not found", nil)
+		return
+	} else if err != nil {
+		failure(w, http.StatusInternalServerError, "Unable to load server", err)
+		return
+	}
 	metrics, err := a.store.ListMetrics(r.Context(), id, name, from, limit)
 	if err != nil {
 		failure(w, 500, "Unable to load metric history", err)

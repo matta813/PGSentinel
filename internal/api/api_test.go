@@ -546,8 +546,8 @@ func TestMetricHistoryValidation(t *testing.T) {
 	}
 	r := httptest.NewRecorder()
 	h.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/api/v1/servers/"+serverID+"/metric-history?name=connections.total", nil))
-	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != "[]" {
-		t.Fatalf("empty history=%d %s", r.Code, r.Body.String())
+	if r.Code != http.StatusNotFound {
+		t.Fatalf("missing server history=%d %s", r.Code, r.Body.String())
 	}
 }
 
