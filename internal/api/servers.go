@@ -174,7 +174,10 @@ func (a *API) deleteServer(w http.ResponseWriter, r *http.Request) {
 		failure(w, 400, "Invalid server ID", nil)
 		return
 	}
-	if err := a.store.DeleteServer(r.Context(), id); err != nil {
+	if err := a.store.DeleteServer(r.Context(), id); err == sql.ErrNoRows {
+		failure(w, 404, "Server not found", nil)
+		return
+	} else if err != nil {
 		failure(w, 500, "Unable to delete server", err)
 		return
 	}

@@ -176,8 +176,18 @@ func (s *Store) GetServer(ctx context.Context, id string, includePassword bool) 
 	return v, nil
 }
 func (s *Store) DeleteServer(ctx context.Context, id string) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM servers WHERE id=?`, id)
-	return err
+	result, err := s.DB.ExecContext(ctx, `DELETE FROM servers WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if deleted == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 func (s *Store) UpdateServerStatus(ctx context.Context, id, status, version, lastError string, connected bool) error {
 	var last any = nil

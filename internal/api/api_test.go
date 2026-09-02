@@ -346,6 +346,15 @@ func TestServerPortValidation(t *testing.T) {
 	}
 }
 
+func TestDeleteMissingServerReturnsNotFound(t *testing.T) {
+	h := testAPI(t)
+	r := httptest.NewRecorder()
+	h.ServeHTTP(r, httptest.NewRequest(http.MethodDelete, "/api/v1/servers/11111111-1111-4111-8111-111111111111", nil))
+	if r.Code != http.StatusNotFound {
+		t.Fatalf("delete missing server=%d %s", r.Code, r.Body.String())
+	}
+}
+
 func TestVersionAPI(t *testing.T) {
 	h := testAPI(t)
 	r := httptest.NewRecorder()
