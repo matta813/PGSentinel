@@ -254,6 +254,17 @@ func (a *API) serverResource(w http.ResponseWriter, r *http.Request) {
 		failure(w, 404, "Resource not found", nil)
 		return
 	}
+	if !validID(id) {
+		failure(w, http.StatusBadRequest, "Invalid server ID", nil)
+		return
+	}
+	if _, err := a.store.GetServer(r.Context(), id, false); err == sql.ErrNoRows {
+		failure(w, http.StatusNotFound, "Server not found", nil)
+		return
+	} else if err != nil {
+		failure(w, http.StatusInternalServerError, "Unable to load server", err)
+		return
+	}
 	var value any
 	switch kind {
 	case "core":
