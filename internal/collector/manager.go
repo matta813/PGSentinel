@@ -91,32 +91,45 @@ func (m *Manager) Run(ctx context.Context) {
 		m.log.Warn("prune monitoring history at startup", "error", err)
 	}
 	m.collectAll(ctx, cycleAll)
-	fast := time.NewTicker(m.schedule.Fast)
-	standard := time.NewTicker(m.schedule.Standard)
-	slow := time.NewTicker(m.schedule.Slow)
-	metadata := time.NewTicker(m.schedule.Metadata)
-	prune := time.NewTicker(time.Hour)
-	defer fast.Stop()
-	defer standard.Stop()
-	defer slow.Stop()
-	defer metadata.Stop()
-	defer prune.Stop()
+	var workers sync.WaitGroup
+	for _, worker := range []struct {
+		interval time.Duration
+		cycle    collectionCycle
+	}{{m.schedule.Fast, cycleFast}, {m.schedule.Standard, cycleStandard}, {m.schedule.Slow, cycleSlow}, {m.schedule.Metadata, cycleMetadata}} {
+		workers.Add(1)
+		go func(interval time.Duration, cycle collectionCycle) {
+			defer workers.Done()
+			m.runCollectionSchedule(ctx, interval, cycle)
+		}(worker.interval, worker.cycle)
+	}
+	workers.Add(1)
+	go func() {
+		defer workers.Done()
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				if err := m.prune(ctx, now); err != nil {
+					m.log.Warn("prune monitoring history", "error", err)
+				}
+			}
+		}
+	}()
+	workers.Wait()
+}
+
+func (m *Manager) runCollectionSchedule(ctx context.Context, interval time.Duration, cycle collectionCycle) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-fast.C:
-			m.collectAll(ctx, cycleFast)
-		case <-standard.C:
-			m.collectAll(ctx, cycleStandard)
-		case <-slow.C:
-			m.collectAll(ctx, cycleSlow)
-		case <-metadata.C:
-			m.collectAll(ctx, cycleMetadata)
-		case <-prune.C:
-			if err := m.prune(ctx, time.Now()); err != nil {
-				m.log.Warn("prune monitoring history", "error", err)
-			}
+		case <-ticker.C:
+			m.collectAll(ctx, cycle)
 		}
 	}
 }
@@ -184,8 +197,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		replication, replicationErr := collector.CollectReplication(ctx)
 		if replicationErr == nil {
 			snapshot.Replication = replication
-			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", replication, snapshot.CollectedAt)
-			m.recordFresh(ctx, server.ID, "replication", m.schedule.Standard, snapshot.CollectedAt)
+			if !m.saveSnapshot(ctx, server.ID, "replication", replication, snapshot.CollectedAt, m.schedule.Standard) {
+				complete = false
+			}
 		} else {
 			m.log.Warn("collect replication", "server_id", server.ID, "error", replicationErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
@@ -198,8 +212,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 				analyzer.EnrichWritePath(previousWAL, previousReplication, &wal, &snapshot.Replication)
 			}
 			snapshot.WAL = wal
-			_ = m.store.SaveSnapshot(ctx, server.ID, "wal", wal, snapshot.CollectedAt)
-			m.recordFresh(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
+			if !m.saveSnapshot(ctx, server.ID, "wal", wal, snapshot.CollectedAt, m.schedule.Standard) {
+				complete = false
+			}
 		} else {
 			m.log.Warn("collect WAL statistics", "server_id", server.ID, "error", walErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "wal", &snapshot.WAL)
@@ -207,7 +222,10 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			m.recordUnavailable(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
 		}
 		if replicationErr == nil {
-			_ = m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt)
+			if err := m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt); err != nil {
+				complete = false
+				m.log.Warn("save enriched replication snapshot", "server_id", server.ID, "error", err)
+			}
 		}
 		queries, available, statsReset, postmasterStart, queryErr := collector.CollectQueries(ctx)
 		snapshot.Capabilities["pg_stat_statements"] = available
@@ -243,8 +261,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 				m.log.Warn("load query regression history", "server_id", server.ID, "error", historyErr)
 			}
 			snapshot.Queries = queries
-			_ = m.store.SaveSnapshot(ctx, server.ID, "queries", queries, snapshot.CollectedAt)
-			m.recordFresh(ctx, server.ID, "queries", m.schedule.Standard, snapshot.CollectedAt)
+			if !m.saveSnapshot(ctx, server.ID, "queries", queries, snapshot.CollectedAt, m.schedule.Standard) {
+				complete = false
+			}
 		} else {
 			m.log.Warn("collect queries", "server_id", server.ID, "error", queryErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "queries", &snapshot.Queries)
@@ -276,8 +295,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		locks, lockErr := collector.CollectLocks(ctx)
 		if lockErr == nil {
 			snapshot.Locks = locks
-			_ = m.store.SaveSnapshot(ctx, server.ID, "locks", snapshot.Locks, snapshot.CollectedAt)
-			m.recordFresh(ctx, server.ID, "locks", m.schedule.Fast, snapshot.CollectedAt)
+			if !m.saveSnapshot(ctx, server.ID, "locks", snapshot.Locks, snapshot.CollectedAt, m.schedule.Fast) {
+				complete = false
+			}
 		} else {
 			m.log.Warn("collect locks", "server_id", server.ID, "error", lockErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
@@ -292,10 +312,13 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		tables, indexes, collectionComplete := m.collectPerDatabase(ctx, target, snapshot.Databases)
 		if collectionComplete {
 			snapshot.Tables, snapshot.Indexes = tables, indexes
-			_ = m.store.SaveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt)
-			_ = m.store.SaveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt)
-			for _, resource := range []string{"tables", "indexes", "vacuum"} {
-				m.recordFresh(ctx, server.ID, resource, m.schedule.Slow, snapshot.CollectedAt)
+			tablesSaved := m.saveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt, m.schedule.Slow)
+			indexesSaved := m.saveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt, m.schedule.Slow)
+			if tablesSaved && indexesSaved {
+				m.recordFresh(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
+			} else {
+				complete = false
+				m.recordUnavailable(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
 			}
 		} else {
 			_ = m.restoreSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
@@ -321,8 +344,9 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 					m.log.Warn("record configuration change", "server_id", server.ID, "error", err)
 				}
 			}
-			_ = m.store.SaveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt)
-			m.recordFresh(ctx, server.ID, "configuration", m.schedule.Metadata, snapshot.CollectedAt)
+			if !m.saveSnapshot(ctx, server.ID, "configuration", snapshot.Settings, snapshot.CollectedAt, m.schedule.Metadata) {
+				complete = false
+			}
 		} else {
 			m.log.Warn("collect configuration", "server_id", server.ID, "error", settingsErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
@@ -333,8 +357,14 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		_ = m.store.LatestSnapshot(ctx, server.ID, "configuration", &snapshot.Settings)
 	}
 	if coreFresh {
-		_ = m.store.SaveSnapshot(ctx, server.ID, "core", snapshot, snapshot.CollectedAt)
-		_ = m.store.SaveMetrics(ctx, snapshotMetrics(snapshot))
+		if err := m.store.SaveSnapshot(ctx, server.ID, "core", snapshot, snapshot.CollectedAt); err != nil {
+			complete = false
+			m.log.Warn("save core snapshot", "server_id", server.ID, "error", err)
+		}
+		if err := m.store.SaveMetrics(ctx, snapshotMetrics(snapshot)); err != nil {
+			complete = false
+			m.log.Warn("save metrics", "server_id", server.ID, "error", err)
+		}
 	}
 	if cycle == cycleMetadata {
 		m.log.Info("metadata collection complete", "server_id", server.ID)
@@ -359,6 +389,16 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	status, lastError := collectionOutcome(complete)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, status, snapshot.Version, lastError, true)
 	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+}
+
+func (m *Manager) saveSnapshot(ctx context.Context, serverID, resource string, value any, at time.Time, interval time.Duration) bool {
+	if err := m.store.SaveSnapshot(ctx, serverID, resource, value, at); err != nil {
+		m.log.Warn("save snapshot", "server_id", serverID, "resource", resource, "error", err)
+		m.recordUnavailable(ctx, serverID, resource, interval, at)
+		return false
+	}
+	m.recordFresh(ctx, serverID, resource, interval, at)
+	return true
 }
 
 func changedSettings(before, after map[string]string) []string {
