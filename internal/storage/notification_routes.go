@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"time"
-
 	"github.com/matta813/pgsentinel/internal/models"
+	"strings"
+	"time"
 )
 
 func (s *Store) CreateNotificationRoute(ctx context.Context, route *models.NotificationRoute) error {
@@ -111,4 +111,45 @@ func (s *Store) DeleteNotificationRoute(ctx context.Context, id string) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+func routeMatches(raw, value string) bool {
+	var values []string
+	if json.Unmarshal([]byte(raw), &values) != nil || len(values) == 0 {
+		return true
+	}
+	for _, candidate := range values {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
+}
+
+func routeMatchesFold(raw, value string) bool {
+	var values []string
+	if json.Unmarshal([]byte(raw), &values) != nil || len(values) == 0 {
+		return true
+	}
+	for _, candidate := range values {
+		if strings.EqualFold(candidate, value) {
+			return true
+		}
+	}
+	return false
+}
+
+func routeTagsMatch(raw string, serverTags []string) bool {
+	var wanted []string
+	if json.Unmarshal([]byte(raw), &wanted) != nil || len(wanted) == 0 {
+		return true
+	}
+	for _, want := range wanted {
+		for _, actual := range serverTags {
+			if strings.EqualFold(want, actual) {
+				return true
+			}
+		}
+	}
+	return false
 }
