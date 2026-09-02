@@ -197,9 +197,6 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		replication, replicationErr := collector.CollectReplication(ctx)
 		if replicationErr == nil {
 			snapshot.Replication = replication
-			if !m.saveSnapshot(ctx, server.ID, "replication", replication, snapshot.CollectedAt, m.schedule.Standard) {
-				complete = false
-			}
 		} else {
 			m.log.Warn("collect replication", "server_id", server.ID, "error", replicationErr)
 			_ = m.restoreSnapshot(ctx, server.ID, "replication", &snapshot.Replication)
@@ -222,9 +219,8 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 			m.recordUnavailable(ctx, server.ID, "wal", m.schedule.Standard, snapshot.CollectedAt)
 		}
 		if replicationErr == nil {
-			if err := m.store.SaveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt); err != nil {
+			if !m.saveSnapshot(ctx, server.ID, "replication", snapshot.Replication, snapshot.CollectedAt, m.schedule.Standard) {
 				complete = false
-				m.log.Warn("save enriched replication snapshot", "server_id", server.ID, "error", err)
 			}
 		}
 		queries, available, statsReset, postmasterStart, queryErr := collector.CollectQueries(ctx)

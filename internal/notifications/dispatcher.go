@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/matta813/pgsentinel/internal/models"
 	"github.com/matta813/pgsentinel/internal/storage"
 )
 
 type Dispatcher struct {
-	store  *storage.Store
-	policy TargetPolicy
-	log    *slog.Logger
+	store      *storage.Store
+	policy     TargetPolicy
+	log        *slog.Logger
+	dispatchMu sync.Mutex
 }
 
 func NewDispatcher(store *storage.Store, policy TargetPolicy, log *slog.Logger) *Dispatcher {
@@ -21,6 +23,9 @@ func NewDispatcher(store *storage.Store, policy TargetPolicy, log *slog.Logger) 
 }
 
 func (d *Dispatcher) DispatchPending(ctx context.Context) {
+	d.dispatchMu.Lock()
+	defer d.dispatchMu.Unlock()
+
 	items, err := d.store.PendingFindingNotifications(ctx, 50)
 	if err != nil {
 		d.log.Warn("load pending finding notifications", "error", err)
