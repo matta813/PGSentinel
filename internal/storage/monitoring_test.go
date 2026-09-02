@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -18,6 +19,13 @@ func testMonitoringStore(t *testing.T, name string) (*Store, context.Context) {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	return s, context.Background()
+}
+
+func TestDeleteServerReportsMissingTarget(t *testing.T) {
+	s, ctx := testMonitoringStore(t, "delete-missing-server")
+	if err := s.DeleteServer(ctx, "missing"); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("DeleteServer error = %v, want sql.ErrNoRows", err)
+	}
 }
 
 func TestFindingLifecycle(t *testing.T) {
