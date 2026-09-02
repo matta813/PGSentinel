@@ -36,3 +36,25 @@ func TestChangeEventLifecycle(t *testing.T) {
 		t.Fatalf("items=%#v err=%v", items, err)
 	}
 }
+
+func TestChangeEventDetailsAreAlwaysAnArray(t *testing.T) {
+	store, ctx := testMonitoringStore(t, "change-event-details")
+	server := models.Server{ID: "server", Name: "db", Host: "localhost", Port: 5432, User: "monitor", Password: "secret", SSLMode: "disable"}
+	if err := store.CreateServer(ctx, &server); err != nil {
+		t.Fatal(err)
+	}
+	event := models.ChangeEvent{ServerID: server.ID, Kind: "deployment", Summary: "Release", OccurredAt: time.Now().UTC()}
+	if err := store.RecordChangeEvent(ctx, &event); err != nil {
+		t.Fatal(err)
+	}
+	if event.Details == nil {
+		t.Fatal("created event details must be an empty array, not nil")
+	}
+	items, err := store.ListChangeEvents(ctx, server.ID, time.Time{}, time.Time{}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Details == nil {
+		t.Fatalf("stored event details = %#v, want an empty array", items)
+	}
+}
