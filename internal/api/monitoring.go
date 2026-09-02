@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+func (a *API) registerMonitoringRoutes() {
+	a.mux.HandleFunc("GET /api/v1/servers/{id}/metric-history", a.metricHistory)
+	a.mux.HandleFunc("GET /api/v1/servers/{id}/freshness", a.serverFreshness)
+	a.mux.HandleFunc("GET /api/v1/problems", a.listProblems)
+	a.mux.HandleFunc("PUT /api/v1/problems/{id}/status", a.updateProblemStatus)
+	a.mux.HandleFunc("GET /api/v1/overview", a.overview)
+	a.mux.HandleFunc("GET /api/v1/servers/{id}/{resource}", a.serverResource)
+}
+
 var historicalMetrics = map[string]bool{
 	"connections.active": true, "connections.total": true, "connections.utilization": true,
 	"connections.waiting": true, "server.uptime_seconds": true,

@@ -15,6 +15,18 @@ import (
 	"github.com/matta813/pgsentinel/internal/models"
 )
 
+func (a *API) registerOperatorControlRoutes() {
+	a.mux.HandleFunc("GET /api/v1/maintenance-windows", a.listMaintenanceWindows)
+	a.mux.HandleFunc("POST /api/v1/maintenance-windows", a.createMaintenanceWindow)
+	a.mux.HandleFunc("DELETE /api/v1/maintenance-windows/{id}", a.deleteMaintenanceWindow)
+	a.mux.HandleFunc("GET /api/v1/suppressions", a.listSuppressions)
+	a.mux.HandleFunc("POST /api/v1/suppressions", a.createSuppression)
+	a.mux.HandleFunc("DELETE /api/v1/suppressions/{id}", a.deleteSuppression)
+	a.mux.HandleFunc("GET /api/v1/threshold-overrides", a.listThresholdOverrides)
+	a.mux.HandleFunc("POST /api/v1/threshold-overrides", a.createThresholdOverride)
+	a.mux.HandleFunc("DELETE /api/v1/threshold-overrides/{id}", a.deleteThresholdOverride)
+}
+
 const operatorControlLimit = 200
 
 func (a *API) listMaintenanceWindows(w http.ResponseWriter, r *http.Request) {

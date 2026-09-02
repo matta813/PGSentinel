@@ -10,6 +10,10 @@ import (
 	"github.com/matta813/pgsentinel/internal/storage"
 )
 
+func (a *API) registerAuditRoutes() {
+	a.mux.HandleFunc("GET /api/v1/audit-events", a.listAuditEvents)
+}
+
 func (a *API) audit(r *http.Request, actor, action, resourceType, resourceID, summary string) {
 	if actor == "" && a.auth != nil {
 		if session, ok := a.auth.Session(r); ok {

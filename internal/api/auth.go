@@ -8,6 +8,13 @@ import (
 	"github.com/matta813/pgsentinel/internal/auth"
 )
 
+func (a *API) registerAuthRoutes() {
+	a.mux.HandleFunc("POST /api/v1/auth/login", a.login)
+	a.mux.HandleFunc("GET /api/v1/auth/session", a.session)
+	a.mux.HandleFunc("POST /api/v1/auth/logout", a.logout)
+	a.mux.HandleFunc("PUT /api/v1/auth/password", a.changePassword)
+}
+
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

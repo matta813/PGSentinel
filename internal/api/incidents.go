@@ -8,6 +8,11 @@ import (
 	"github.com/matta813/pgsentinel/internal/storage"
 )
 
+func (a *API) registerIncidentRoutes() {
+	a.mux.HandleFunc("GET /api/v1/incidents", a.listIncidents)
+	a.mux.HandleFunc("GET /api/v1/incidents/{id}", a.getIncident)
+}
+
 func (a *API) listIncidents(w http.ResponseWriter, r *http.Request) {
 	filter := storage.IncidentFilter{Status: r.URL.Query().Get("status"), ServerID: r.URL.Query().Get("serverId"), Limit: 50}
 	if filter.Status == "all" {

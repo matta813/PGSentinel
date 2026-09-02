@@ -14,6 +14,10 @@ import (
 	"github.com/matta813/pgsentinel/internal/storage"
 )
 
+func (a *API) registerDiagnosticRoutes() {
+	a.mux.HandleFunc("GET /api/v1/diagnostic-bundle", a.diagnosticBundle)
+}
+
 const diagnosticFindingLimit = 1000
 
 type diagnosticManifest struct {
