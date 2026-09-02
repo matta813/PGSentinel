@@ -10,6 +10,15 @@ import (
 	"strings"
 )
 
+func (a *API) registerServerRoutes() {
+	a.mux.HandleFunc("GET /api/v1/servers", a.listServers)
+	a.mux.HandleFunc("POST /api/v1/servers", a.createServer)
+	a.mux.HandleFunc("GET /api/v1/servers/{id}", a.getServer)
+	a.mux.HandleFunc("PUT /api/v1/servers/{id}", a.updateServer)
+	a.mux.HandleFunc("DELETE /api/v1/servers/{id}", a.deleteServer)
+	a.mux.HandleFunc("POST /api/v1/servers/{id}/test", a.testServer)
+}
+
 func (a *API) ready(w http.ResponseWriter, r *http.Request) {
 	if err := a.store.DB.PingContext(r.Context()); err != nil {
 		failure(w, 503, "Storage is not ready", err)

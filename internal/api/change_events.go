@@ -10,6 +10,12 @@ import (
 	"github.com/matta813/pgsentinel/internal/models"
 )
 
+func (a *API) registerChangeEventRoutes() {
+	a.mux.HandleFunc("GET /api/v1/change-events", a.listChangeEvents)
+	a.mux.HandleFunc("POST /api/v1/deployments", a.createDeploymentEvent)
+	a.mux.HandleFunc("DELETE /api/v1/deployments/{id}", a.deleteDeploymentEvent)
+}
+
 func (a *API) listChangeEvents(w http.ResponseWriter, r *http.Request) {
 	serverID := r.URL.Query().Get("serverId")
 	if !validID(serverID) {

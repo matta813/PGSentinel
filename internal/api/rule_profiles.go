@@ -11,6 +11,13 @@ import (
 	"time"
 )
 
+func (a *API) registerRuleProfileRoutes() {
+	a.mux.HandleFunc("GET /api/v1/rule-profiles", a.listRuleProfiles)
+	a.mux.HandleFunc("POST /api/v1/rule-profiles", a.createRuleProfile)
+	a.mux.HandleFunc("DELETE /api/v1/rule-profiles/{id}", a.deleteRuleProfile)
+	a.mux.HandleFunc("POST /api/v1/rule-profiles/{id}/apply", a.applyRuleProfile)
+}
+
 type applyProfileRequest struct {
 	ScopeType  string `json:"scopeType"`
 	ScopeValue string `json:"scopeValue"`
