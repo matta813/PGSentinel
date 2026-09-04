@@ -23,8 +23,8 @@ func collectibleDatabases(stats []models.DatabaseStat, limit int) []models.Datab
 	return out
 }
 
-func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, databaseStats []models.DatabaseStat) (tables []models.TableStat, indexes []models.IndexStat, complete bool) {
-	complete = true
+func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, databaseStats []models.DatabaseStat) (tables []models.TableStat, indexes []models.IndexStat, tablesComplete bool, indexesComplete bool) {
+	tablesComplete, indexesComplete = true, true
 	targets := collectibleDatabases(databaseStats, m.schedule.FanoutLimit)
 	if len(targets) == 0 {
 		targets = []models.DatabaseStat{{Name: "postgres"}}
@@ -35,21 +35,21 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		}
 		client, err := pg.ConnectDatabase(ctx, server, database.Name)
 		if err != nil {
-			complete = false
+			tablesComplete, indexesComplete = false, false
 			m.log.Warn("per-database collection failed", "server_id", server.ID, "database", database.Name, "error", err)
 			continue
 		}
 		core := NewCore(client.Pool())
 		databaseTables, err := core.CollectTables(ctx, database.Name)
 		if err != nil {
-			complete = false
+			tablesComplete = false
 			m.log.Warn("collect tables", "server_id", server.ID, "database", database.Name, "error", err)
 		} else {
 			tables = append(tables, databaseTables...)
 		}
 		databaseIndexes, err := core.CollectIndexes(ctx)
 		if err != nil {
-			complete = false
+			indexesComplete = false
 			m.log.Warn("collect indexes", "server_id", server.ID, "database", database.Name, "error", err)
 		} else {
 			indexes = append(indexes, databaseIndexes...)

@@ -158,24 +158,28 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		_ = m.store.LatestSnapshot(ctx, server.ID, "locks", &snapshot.Locks)
 	}
 	if cycle&cycleSlow != 0 {
-		tables, indexes, collectionComplete := m.collectPerDatabase(ctx, target, snapshot.Databases)
-		if collectionComplete {
-			snapshot.Tables, snapshot.Indexes = tables, indexes
-			tablesSaved := m.saveSnapshot(ctx, server.ID, "tables", snapshot.Tables, snapshot.CollectedAt, m.schedule.Slow)
-			indexesSaved := m.saveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt, m.schedule.Slow)
-			if tablesSaved && indexesSaved {
-				m.recordFresh(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
-			} else {
+		tables, indexes, tablesComplete, indexesComplete := m.collectPerDatabase(ctx, target, snapshot.Databases)
+		var tablesFresh bool
+		snapshot.Tables, tablesFresh = m.persistTableCollection(ctx, server.ID, tables, tablesComplete, snapshot.CollectedAt)
+		if !tablesFresh {
+			complete = false
+		}
+		if indexesComplete {
+			snapshot.Indexes = indexes
+			if !m.saveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt, m.schedule.Slow) {
 				complete = false
-				m.recordUnavailable(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
 			}
 		} else {
-			_ = m.restoreSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
 			_ = m.restoreSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes)
 			complete = false
-			for _, resource := range []string{"tables", "indexes", "vacuum"} {
-				m.recordPartial(ctx, server.ID, resource, m.schedule.Slow, snapshot.CollectedAt)
-			}
+			m.recordPartial(ctx, server.ID, "indexes", m.schedule.Slow, snapshot.CollectedAt)
+		}
+		if tablesFresh {
+			m.recordFresh(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
+		} else if !tablesComplete {
+			m.recordPartial(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
+		} else {
+			m.recordUnavailable(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)
 		}
 	} else {
 		_ = m.store.LatestSnapshot(ctx, server.ID, "tables", &snapshot.Tables)
