@@ -1,106 +1,156 @@
 #!/usr/bin/env python3
+import argparse
+import json
 import re
-import sys
 from collections import OrderedDict
 from pathlib import Path
 
-
-CATEGORIES = OrderedDict(
-    [
-        ("security", "🔒 Security"),
-        ("features", "🚀 Features"),
-        ("fixes", "🐛 Bug fixes"),
-        ("performance", "⚡ Performance"),
-        ("documentation", "📚 Documentation"),
-        ("dependencies", "📦 Dependencies"),
-        ("tests", "🧪 Tests"),
-        ("maintenance", "🧰 Maintenance"),
-        ("general", "📈 General Changes"),
-    ]
-)
+CATEGORIES = OrderedDict([
+    ("security", "🔒 Security"), ("features", "🚀 Features"),
+    ("fixes", "🐛 Bug fixes"), ("performance", "⚡ Performance"),
+    ("documentation", "📚 Documentation"), ("dependencies", "📦 Dependencies"),
+    ("tests", "🧪 Tests"), ("maintenance", "🧰 Maintenance"),
+    ("general", "📈 General Changes"),
+])
 CONVENTIONAL = re.compile(
     r"^(?P<kind>feat|fix|perf|docs|test|refactor|chore|ci|build)"
-    r"(?:\((?P<scope>[^)]+)\))?(?:!)?:\s*(?P<title>.+)$",
-    re.IGNORECASE,
+    r"(?:\((?P<scope>[^)]+)\))?(?:!)?:\s*(?P<title>.+)$", re.IGNORECASE,
 )
-ENTRY = re.compile(
-    r"^\* (?P<title>.*?) by @(?P<author>\S+) in "
-    r"(?P<reference>#\d+|https://github\.com/[^/]+/[^/]+/pull/\d+)$"
+BRANCH_CATEGORIES = (
+    (("feat/", "feature/"), "features"), (("fix/", "bugfix/"), "fixes"),
+    (("security/",), "security"), (("perf/",), "performance"),
+    (("docs/",), "documentation"), (("test/",), "tests"),
+    (("refactor/", "chore/", "ci/", "build/"), "maintenance"),
 )
 
 
-def classify(title: str) -> tuple[str, str]:
-    match = CONVENTIONAL.match(title)
-    if not match:
-        return "general", title
-    kind = match.group("kind").lower()
-    scope = (match.group("scope") or "").lower()
-    clean = match.group("title")
-    if "security" in scope:
+def normalized_labels(pr: dict) -> set[str]:
+    return {str(label).strip().lower() for label in pr.get("labels", [])}
+
+
+def is_dependency(pr: dict, labels: set[str]) -> bool:
+    title, branch, author = pr["title"].lower(), pr.get("head_ref", "").lower(), pr.get("author", "").lower()
+    return (title.startswith(("chore(deps):", "chore(deps-dev):"))
+            or author == "dependabot[bot]" or branch.startswith("dependabot/")
+            or any("depend" in label for label in labels))
+
+
+def is_security(pr: dict, labels: set[str]) -> bool:
+    title, branch = pr["title"].lower(), pr.get("head_ref", "").lower()
+    return (title.startswith("fix(security):") or branch.startswith("security/")
+            or any(label in {"security", "type: security", "changelog: security"} for label in labels))
+
+
+def documentation_only(files: list[str]) -> bool:
+    roots = {"readme.md", "security.md", "contributing.md", "code_of_conduct.md", "license"}
+    return bool(files) and all(path.lower().startswith("docs/") or path.lower() in roots
+                               or path.lower().endswith((".md", ".mdx", ".rst")) for path in files)
+
+
+def classify(pr: dict) -> tuple[str, str]:
+    title, labels = pr["title"].strip(), normalized_labels(pr)
+    if is_security(pr, labels):
         category = "security"
-    elif "dep" in scope:
+    elif is_dependency(pr, labels):
         category = "dependencies"
     else:
-        category = {
-            "feat": "features",
-            "fix": "fixes",
-            "perf": "performance",
-            "docs": "documentation",
-            "test": "tests",
-            "refactor": "maintenance",
-            "chore": "maintenance",
-            "ci": "maintenance",
-            "build": "maintenance",
-        }[kind]
-    return category, clean[0].upper() + clean[1:] if clean else clean
+        match = CONVENTIONAL.match(title)
+        if match:
+            category = {"feat": "features", "fix": "fixes", "perf": "performance",
+                        "docs": "documentation", "test": "tests", "refactor": "maintenance",
+                        "chore": "maintenance", "ci": "maintenance", "build": "maintenance"}[match.group("kind").lower()]
+        else:
+            branch, category = pr.get("head_ref", "").lower(), ""
+            for prefixes, candidate in BRANCH_CATEGORIES:
+                if branch.startswith(prefixes):
+                    category = candidate
+                    break
+            if not category:
+                category = "documentation" if documentation_only(pr.get("files", [])) else "general"
+    match = CONVENTIONAL.match(title)
+    clean = match.group("title").strip() if match else title
+    if match and clean:
+        clean = clean[0].upper() + clean[1:]
+    return category, clean
+
+
+def extract_new_contributors(body: str) -> list[str]:
+    lines = body.splitlines()
+    try:
+        start = lines.index("## New Contributors")
+    except ValueError:
+        return []
+    result = ["## New Contributors"]
+    for line in lines[start + 1:]:
+        if line.startswith("**Full Changelog**") or line.startswith("## "):
+            break
+        result.append(line)
+    while result and not result[-1].strip():
+        result.pop()
+    return result if len(result) > 1 else []
+
+
+def sorted_prs(prs: list[dict]) -> list[dict]:
+    if all(pr.get("merged_at") for pr in prs):
+        return sorted(prs, key=lambda pr: (pr["merged_at"], int(pr["number"])))
+    return sorted(prs, key=lambda pr: int(pr["number"]))
+
+
+def render(metadata: dict) -> tuple[str, dict]:
+    version, tag = metadata["version"], metadata.get("tag", f"v{metadata['version']}")
+    source_pr = metadata.get("source_pr")
+    source_number = int(source_pr["number"]) if source_pr else None
+    excluded, included = [], []
+    for pr in metadata.get("prs", []):
+        reason = None
+        if source_number is not None and int(pr["number"]) == source_number:
+            reason = "release-source"
+        elif "skip-changelog" in normalized_labels(pr):
+            reason = "skip-changelog"
+        (excluded if reason else included).append(
+            {"number": int(pr["number"]), "reason": reason} if reason else pr
+        )
+
+    sections, classified = {key: [] for key in CATEGORIES}, {}
+    for pr in sorted_prs(included):
+        category, title = classify(pr)
+        classified[str(pr["number"])] = category
+        sections[category].append(f"* {title} [PR #{pr['number']}]({pr['url']}), by @{pr['author']}")
+
+    kind = "preview release" if "-" in version else "stable release"
+    output = [f"# 🚀 PGSentinel {version}", "",
+              f"We are pleased to announce PGSentinel {version}, the latest {kind} of PGSentinel!",
+              "This release improves PostgreSQL monitoring while keeping recommendations evidence-driven and operator-controlled.",
+              "Before upgrading, back up the PGSentinel data volume and keep the encryption key and administrator password available.",
+              "", f"## Changelog ({len(included)})"]
+    for category, heading in CATEGORIES.items():
+        if sections[category]:
+            output.extend(("", f"### {heading}", *sections[category]))
+    contributors = extract_new_contributors(metadata.get("generated_body", ""))
+    if contributors:
+        output.extend(("", *contributors))
+    previous_tag = metadata.get("previous_tag", "")
+    if previous_tag:
+        output.extend(("", f"**Full Changelog**: https://github.com/{metadata['repository']}/compare/{previous_tag}...{tag}"))
+    output.append("")
+    stats = {"count": len(included), "excluded": excluded, "source_pr": source_number,
+             "categories": classified, "previous_tag": previous_tag}
+    return "\n".join(output), stats
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: format-release-notes.py VERSION GENERATED_NOTES")
-    version = sys.argv[1]
-    body = Path(sys.argv[2]).read_text(encoding="utf-8")
-    sections = {key: [] for key in CATEGORIES}
-    tail = []
-    in_tail = False
-    for line in body.splitlines():
-        if line == "## What's Changed" or (line.startswith("### ") and not in_tail):
-            continue
-        if line == "## New Contributors" or line.startswith("**Full Changelog**"):
-            in_tail = True
-        if in_tail:
-            tail.append(line)
-            continue
-        match = ENTRY.match(line)
-        if match:
-            category, title = classify(match.group("title"))
-            reference = match.group("reference")
-            if reference.startswith("https://"):
-                number = reference.rsplit("/", 1)[-1]
-                pr = f"[PR #{number}]({reference})"
-            else:
-                pr = f"PR {reference}"
-            sections[category].append(f"* {title} {pr}, by @{match.group('author')}")
-
-    count = sum(len(entries) for entries in sections.values())
-    prerelease = "-" in version
-    kind = "preview release" if prerelease else "stable release"
-    print(f"# 🚀 PGSentinel {version}")
-    print()
-    print(f"We are pleased to announce PGSentinel {version}, the latest {kind} of PGSentinel!")
-    print("This release improves PostgreSQL monitoring while keeping recommendations evidence-driven and operator-controlled.")
-    print("Before upgrading, back up the PGSentinel data volume and keep the encryption key and administrator password available.")
-    print()
-    print(f"## Changelog ({count})")
-    for category, heading in CATEGORIES.items():
-        entries = sections[category]
-        if entries:
-            print()
-            print(f"### {heading}")
-            print("\n".join(entries))
-    if tail:
-        print()
-        print("\n".join(tail).strip())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("metadata", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--stats", type=Path)
+    args = parser.parse_args()
+    body, stats = render(json.loads(args.metadata.read_text(encoding="utf-8")))
+    if args.output:
+        args.output.write_text(body, encoding="utf-8")
+    else:
+        print(body, end="")
+    if args.stats:
+        args.stats.write_text(json.dumps(stats, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

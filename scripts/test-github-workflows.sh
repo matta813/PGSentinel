@@ -15,11 +15,45 @@ test -f "$growth"
 test -f "$dependabot"
 test -f "$osv_config"
 grep -Fq 'paths: [RELEASE]' "$release"
+grep -Fq 'tag:' "$release"
+if grep -Fq 'recover:' "$release"; then
+  echo "manual release recovery must use an explicit tag, not a boolean" >&2
+  exit 1
+fi
+grep -Fq './scripts/release-metadata.sh recovery "$REQUESTED_TAG"' "$release"
+grep -Fq 'ref: ${{ needs.validate.outputs.source_sha }}' "$release"
 grep -Fq 'packages: write' "$release"
 grep -Fq 'docker/build-push-action@' "$release"
 grep -Fq 'provenance: mode=max' "$release"
+grep -Fq 'COMMIT_SHA=${{ needs.validate.outputs.source_sha }}' "$release"
+grep -Fq 'BUILD_TIME=${{ needs.validate.outputs.source_timestamp }}' "$release"
+grep -Fq 'image_digest:' "$release"
+grep -Fq 'docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE@$IMAGE_DIGEST"' "$release"
+grep -Fq "if: needs.validate.outputs.stable == 'true'" "$release"
+anchor_line=$(grep -n '^  anchor-release-tag:' "$release" | cut -d: -f1)
+image_line=$(grep -n '^  publish-version-image:' "$release" | cut -d: -f1)
+github_release_line=$(grep -n '^  create-or-repair-github-release:' "$release" | cut -d: -f1)
+latest_line=$(grep -n '^  promote-latest:' "$release" | cut -d: -f1)
+if ! [ "$anchor_line" -lt "$image_line" ] || ! [ "$image_line" -lt "$github_release_line" ] || ! [ "$github_release_line" -lt "$latest_line" ]; then
+  echo "release publication jobs are in an unsafe order" >&2
+  exit 1
+fi
+if sed -n "1,$((latest_line - 1))p" "$release" | grep -Fq ':latest'; then
+  echo "latest must not be published before the promotion job" >&2
+  exit 1
+fi
+if [ "$(grep -c '^permissions:$' "$release")" -ne 1 ] || ! sed -n '/^permissions:/,/^[^ ]/p' "$release" | grep -Fq 'contents: read'; then
+  echo "release workflow must default to contents: read" >&2
+  exit 1
+fi
+if sed -n '/^  validate:/,/^  verify:/p' "$release" | grep -Eq 'contents: write|packages: write|id-token: write'; then
+  echo "release validation must remain read-only" >&2
+  exit 1
+fi
 grep -Fq 'workflows: [Release]' "$announcement"
 grep -Fq 'contents: read' "$announcement"
+grep -Fq 'actions: read' "$announcement"
+grep -Fq 'gh run download "$RELEASE_RUN_ID"' "$announcement"
 if grep -Eq 'github\.event\.workflow_run\.(head_sha|head_branch)' "$announcement"; then
   echo "release announcement must not check out workflow_run-controlled revisions" >&2
   exit 1

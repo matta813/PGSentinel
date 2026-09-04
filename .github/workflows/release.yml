@@ -6,11 +6,10 @@ on:
     paths: [RELEASE]
   workflow_dispatch:
     inputs:
-      recover:
-        description: Republish the current version after a partial release failure
+      tag:
+        description: Immutable release tag to recover (for example v0.8.1)
         required: true
-        type: boolean
-        default: false
+        type: string
 
 permissions:
   contents: read
@@ -26,29 +25,57 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
       stable: ${{ steps.release.outputs.stable }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
+      source_timestamp: ${{ steps.release.outputs.source_timestamp }}
+      previous_tag: ${{ steps.release.outputs.previous_tag }}
+      mode: ${{ steps.release.outputs.mode }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - id: release
-        name: Validate release version
+        name: Resolve immutable release identity
         env:
-          SKIP_REMOTE_CHECK: ${{ github.event_name == 'workflow_dispatch' && inputs.recover && 'true' || 'false' }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
         run: |
-          previous_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
-          PREVIOUS_VERSION="${previous_tag#v}" ./scripts/validate-release.sh RELEASE
-          . ./release.env
-          {
-            echo "version=$RELEASE_VERSION"
-            echo "tag=$RELEASE_TAG"
-            echo "stable=$RELEASE_STABLE"
-          } >> "$GITHUB_OUTPUT"
+          metadata=$(mktemp)
+          trap 'rm -f "$metadata"' EXIT
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            [ -n "$REQUESTED_TAG" ] || { echo "recovery tag is required" >&2; exit 1; }
+            ./scripts/release-metadata.sh recovery "$REQUESTED_TAG" > "$metadata"
+          else
+            ./scripts/release-metadata.sh normal "$GITHUB_SHA" > "$metadata"
+          fi
+          while IFS='=' read -r key value; do
+            case "$key" in
+              tag) tag=$value ;;
+              stable) stable=$value ;;
+              source_sha) source_sha=$value ;;
+            esac
+          done < "$metadata"
+          if release=$(gh release view "$tag" --json targetCommitish,isPrerelease 2>/dev/null); then
+            target=$(printf '%s' "$release" | jq -r .targetCommitish)
+            target_sha=$(git rev-parse --verify "$target^{commit}")
+            [ "$target_sha" = "$source_sha" ] || { echo "GitHub Release target mismatch" >&2; exit 1; }
+            actual_prerelease=$(printf '%s' "$release" | jq -r .isPrerelease)
+            expected_prerelease=true; [ "$stable" = true ] && expected_prerelease=false
+            [ "$actual_prerelease" = "$expected_prerelease" ] || {
+              echo "GitHub Release prerelease state mismatch" >&2
+              exit 1
+            }
+          fi
+          cat "$metadata" >> "$GITHUB_OUTPUT"
 
   verify:
     needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
@@ -66,53 +93,20 @@ jobs:
       - run: npm --prefix frontend test -- --run
       - run: npm --prefix frontend run build
       - run: CGO_ENABLED=0 go build -trimpath -o pgsentinel ./cmd/pgsentinel
-
-  publish-image:
-    needs: [validate, verify]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: image
-        name: Prepare image tags
+      - name: Verify release infrastructure
         env:
-          VERSION: ${{ needs.validate.outputs.version }}
-          TAG: ${{ needs.validate.outputs.tag }}
-          STABLE: ${{ needs.validate.outputs.stable }}
+          SKIP_REMOTE_CHECK: "true"
         run: |
-          # OCI repository names must be lowercase; GitHub preserves the
-          # mixed-case repository display name in GITHUB_REPOSITORY.
-          image="ghcr.io/${GITHUB_REPOSITORY,,}"
-          {
-            echo 'tags<<EOF'
-            echo "$image:$VERSION"
-            echo "$image:$TAG"
-            if [ "$STABLE" = true ]; then echo "$image:latest"; fi
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-      - name: Build and publish container
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
-        with:
-          context: .
-          push: true
-          provenance: mode=max
-          tags: ${{ steps.image.outputs.tags }}
-          build-args: |
-            VERSION=${{ needs.validate.outputs.version }}
-            COMMIT_SHA=${{ github.sha }}
-            BUILD_TIME=${{ github.event.repository.updated_at }}
-  create-release:
-    needs: [validate, verify, publish-image]
+          ./scripts/validate-release.sh RELEASE
+          ./scripts/test-release.sh
+          ./scripts/test-release-notes.sh
+          ./scripts/test-github-workflows.sh
+          ./scripts/test-compose.sh
+          python3 ./scripts/check-markdown-links.py
+          git diff --check
+
+  anchor-release-tag:
+    needs: [validate, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,33 +114,236 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      - name: Generate release notes
+      - name: Create or verify immutable release tag
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+        run: |
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            actual=$(git rev-parse "$TAG^{commit}")
+            [ "$actual" = "$SOURCE_SHA" ] || {
+              echo "refusing to move $TAG from $actual to $SOURCE_SHA" >&2
+              exit 1
+            }
+            echo "$TAG already anchors $SOURCE_SHA"
+          else
+            git tag "$TAG" "$SOURCE_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+
+  publish-version-image:
+    needs: [validate, anchor-release-tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      image_digest: ${{ steps.result.outputs.image_digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        name: Resolve immutable image names
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "image=$image"
+            echo "version_ref=$image:$VERSION"
+            echo "tag_ref=$image:$TAG"
+          } >> "$GITHUB_OUTPUT"
+      - id: existing
+        name: Reuse and verify an existing version image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          VERSION_REF: ${{ steps.image.outputs.version_ref }}
+          TAG_REF: ${{ steps.image.outputs.tag_ref }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          SOURCE_TIMESTAMP: ${{ needs.validate.outputs.source_timestamp }}
+        run: |
+          version_digest=$(docker buildx imagetools inspect "$VERSION_REF" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+          tag_digest=$(docker buildx imagetools inspect "$TAG_REF" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+          if [ -z "$version_digest" ] && [ -z "$tag_digest" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          existing_ref=$VERSION_REF
+          existing_digest=$version_digest
+          if [ -z "$existing_digest" ]; then existing_ref=$TAG_REF; existing_digest=$tag_digest; fi
+          labels=$(docker buildx imagetools inspect "$existing_ref" --format '{{json .Image.Config.Labels}}')
+          printf '%s' "$labels" | jq -e --arg source "https://github.com/$GITHUB_REPOSITORY" --arg revision "$SOURCE_SHA" --arg version "$VERSION" --arg created "$SOURCE_TIMESTAMP" \
+            '."org.opencontainers.image.source" == $source and ."org.opencontainers.image.revision" == $revision and ."org.opencontainers.image.version" == $version and ."org.opencontainers.image.created" == $created' >/dev/null || {
+              echo "existing version image metadata does not match immutable release source" >&2
+              exit 1
+            }
+          if [ -n "$version_digest" ] && [ -n "$tag_digest" ] && [ "$version_digest" != "$tag_digest" ]; then
+            echo "immutable version tags resolve to different digests" >&2
+            exit 1
+          fi
+          if [ -z "$version_digest" ]; then docker buildx imagetools create --tag "$VERSION_REF" "$IMAGE@$existing_digest"; fi
+          if [ -z "$tag_digest" ]; then docker buildx imagetools create --tag "$TAG_REF" "$IMAGE@$existing_digest"; fi
+          echo "build=false" >> "$GITHUB_OUTPUT"
+          echo "digest=$existing_digest" >> "$GITHUB_OUTPUT"
+      - id: build
+        if: steps.existing.outputs.build == 'true'
+        name: Build and publish immutable version image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          push: true
+          provenance: mode=max
+          tags: |
+            ${{ steps.image.outputs.version_ref }}
+            ${{ steps.image.outputs.tag_ref }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.validate.outputs.source_sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+            org.opencontainers.image.created=${{ needs.validate.outputs.source_timestamp }}
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+            COMMIT_SHA=${{ needs.validate.outputs.source_sha }}
+            BUILD_TIME=${{ needs.validate.outputs.source_timestamp }}
+      - id: result
+        env:
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
+        run: |
+          digest=${BUILD_DIGEST:-$EXISTING_DIGEST}
+          case "$digest" in sha256:*) ;; *) echo "invalid image digest: $digest" >&2; exit 1 ;; esac
+          echo "image_digest=$digest" >> "$GITHUB_OUTPUT"
+
+  create-or-repair-github-release:
+    needs: [validate, publish-version-image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_url: ${{ steps.release.outputs.release_url }}
+      source_pr: ${{ steps.release.outputs.source_pr }}
+      excluded_prs: ${{ steps.release.outputs.excluded_prs }}
+      changelog_count: ${{ steps.release.outputs.changelog_count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - id: release
+        name: Create or verify GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.validate.outputs.version }}
           TAG: ${{ needs.validate.outputs.tag }}
-        run: |
-          previous_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
-          if [ -n "$previous_tag" ]; then
-            gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
-              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" -f previous_tag_name="$previous_tag" \
-              --jq .body > generated-notes.md
-          else
-            gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
-              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
-              --jq .body > generated-notes.md
-          fi
-          ./scripts/release-notes.sh "$VERSION" generated-notes.md > release-notes.md
-      - name: Create or repair GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.validate.outputs.tag }}
           STABLE: ${{ needs.validate.outputs.stable }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          PREVIOUS_TAG: ${{ needs.validate.outputs.previous_tag }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "PGSentinel $TAG" --notes-file release-notes.md
+          RELEASE_NOTES_STATS=release-notes-stats.json ./scripts/generate-release-notes.sh \
+            "$GITHUB_REPOSITORY" "$VERSION" "$TAG" "$SOURCE_SHA" "$PREVIOUS_TAG" release-notes.md
+          source_pr=$(jq -r '.source_pr // "direct-push"' release-notes-stats.json)
+          excluded=$(jq -r '[.excluded[] | "#\(.number) (\(.reason))"] | join(", ")' release-notes-stats.json)
+          count=$(jq -r .count release-notes-stats.json)
+          if release=$(gh release view "$TAG" --json targetCommitish,isPrerelease,url); then
+            target=$(printf '%s' "$release" | jq -r .targetCommitish)
+            target_sha=$(git rev-parse --verify "$target^{commit}")
+            [ "$target_sha" = "$SOURCE_SHA" ] || { echo "GitHub Release target mismatch" >&2; exit 1; }
+            actual_prerelease=$(printf '%s' "$release" | jq -r .isPrerelease)
+            expected_prerelease=true; [ "$STABLE" = true ] && expected_prerelease=false
+            [ "$actual_prerelease" = "$expected_prerelease" ] || { echo "GitHub Release prerelease state mismatch" >&2; exit 1; }
+            url=$(printf '%s' "$release" | jq -r .url)
           elif [ "$STABLE" = true ]; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "PGSentinel $TAG" --notes-file release-notes.md
+            url=$(gh release create "$TAG" --target "$SOURCE_SHA" --title "PGSentinel $TAG" --notes-file release-notes.md)
           else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "PGSentinel $TAG" --notes-file release-notes.md --prerelease
+            url=$(gh release create "$TAG" --target "$SOURCE_SHA" --title "PGSentinel $TAG" --notes-file release-notes.md --prerelease)
           fi
+          {
+            echo "release_url=$url"
+            echo "source_pr=$source_pr"
+            echo "excluded_prs=${excluded:-none}"
+            echo "changelog_count=$count"
+          } >> "$GITHUB_OUTPUT"
+
+  promote-latest:
+    if: needs.validate.outputs.stable == 'true'
+    needs: [validate, publish-version-image, create-or-repair-github-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      latest: ${{ steps.promote.outputs.latest }}
+    steps:
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: promote
+        env:
+          IMAGE: ${{ needs.publish-version-image.outputs.image }}
+          IMAGE_DIGEST: ${{ needs.publish-version-image.outputs.image_digest }}
+        run: |
+          current=$(docker buildx imagetools inspect "$IMAGE:latest" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+          if [ "$current" != "$IMAGE_DIGEST" ]; then
+            docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE@$IMAGE_DIGEST"
+          fi
+          echo "latest=$IMAGE@$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+
+  summary:
+    if: always() && needs.create-or-repair-github-release.result == 'success' && (needs.promote-latest.result == 'success' || needs.promote-latest.result == 'skipped')
+    needs: [validate, publish-version-image, create-or-repair-github-release, promote-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release summary
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          MODE: ${{ needs.validate.outputs.mode }}
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          PREVIOUS_TAG: ${{ needs.validate.outputs.previous_tag }}
+          STABLE: ${{ needs.validate.outputs.stable }}
+          SOURCE_PR: ${{ needs.create-or-repair-github-release.outputs.source_pr }}
+          EXCLUDED: ${{ needs.create-or-repair-github-release.outputs.excluded_prs }}
+          COUNT: ${{ needs.create-or-repair-github-release.outputs.changelog_count }}
+          IMAGE: ${{ needs.publish-version-image.outputs.image }}
+          DIGEST: ${{ needs.publish-version-image.outputs.image_digest }}
+          RELEASE_URL: ${{ needs.create-or-repair-github-release.outputs.release_url }}
+          LATEST: ${{ needs.promote-latest.outputs.latest }}
+        run: |
+          {
+            echo "# PGSentinel v$VERSION"
+            echo
+            echo "- Mode: $MODE"
+            echo "- Source SHA: \`$SOURCE_SHA\`"
+            echo "- Previous tag: ${PREVIOUS_TAG:-none}"
+            echo "- Stable: $STABLE"
+            echo "- Release source PR: $SOURCE_PR"
+            echo "- Excluded changelog PRs: $EXCLUDED"
+            echo "- Changelog entries: $COUNT"
+            echo "- Image: \`$IMAGE\`"
+            echo "- Image digest: \`$DIGEST\`"
+            echo "- GitHub Release: $RELEASE_URL"
+            echo "- latest: ${LATEST:-not promoted for prerelease}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "source_sha=$SOURCE_SHA"
+            echo "release_url=$RELEASE_URL"
+          } > release-metadata.env
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-metadata
+          path: release-metadata.env
+          if-no-files-found: error
+          retention-days: 30
