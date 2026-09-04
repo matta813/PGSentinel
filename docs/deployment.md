@@ -42,7 +42,7 @@ The generated `pgsentinel/.env` defaults to host port `8080` and timezone `UTC`.
 
 ## Version pinning and upgrades
 
-Production deployments should use an immutable release version instead of `latest`. To upgrade:
+Production deployments should use an immutable release version instead of `latest`. The release pipeline binds both `VERSION` and `vVERSION` image tags to the release tag's commit and promotes `latest` to that exact digest only after the stable GitHub Release succeeds. To upgrade:
 
 1. Read the GitHub release notes and back up `/data`.
 2. Change `PGSENTINEL_VERSION` in the deployment environment.

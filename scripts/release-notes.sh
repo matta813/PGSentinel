@@ -1,8 +1,6 @@
 #!/bin/sh
 set -eu
-
-version=${1:?version required}
-generated_notes=${2:?GitHub-generated notes file required}
+metadata=${1:?release metadata JSON required}
+shift
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-
-exec python3 "$script_dir/format-release-notes.py" "$version" "$generated_notes"
+exec python3 "$script_dir/format-release-notes.py" "$metadata" "$@"

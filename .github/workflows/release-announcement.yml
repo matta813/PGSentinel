@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   draft:
@@ -26,10 +27,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           REQUESTED_TAG: ${{ inputs.tag }}
+          RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           if [ "$EVENT_NAME" = workflow_run ]; then
-            version=$(tr -d '\n' < RELEASE)
-            tag="v$version"
+            gh run download "$RELEASE_RUN_ID" --repo "$GITHUB_REPOSITORY" --name release-metadata --dir /tmp/release-metadata
+            . /tmp/release-metadata/release-metadata.env
           else
             tag="$REQUESTED_TAG"
             version=${tag#v}

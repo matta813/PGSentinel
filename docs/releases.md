@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-`RELEASE` contains exactly one newline-terminated Semantic Version without `v`, comments or whitespace. Stable versions use `MAJOR.MINOR.PATCH`; pre-releases such as `1.0.0-rc.1` are supported. Validation rejects prefixes, incomplete versions, leading-zero numeric components, duplicate tags, unchanged effective values, and versions whose SemVer precedence is not greater than the latest `v*` tag.
+`RELEASE` contains exactly one newline-terminated Semantic Version without `v`, comments or whitespace. Stable versions use `MAJOR.MINOR.PATCH`; pre-releases such as `1.0.0-rc.1` are supported. Validation rejects prefixes, incomplete versions, leading-zero numeric components, mismatched existing tags, unchanged effective values, and versions whose SemVer precedence is not greater than the latest valid PGSentinel release tag. Tag selection uses Semantic Version precedence rather than Git's `version:refname` ordering, so a stable version correctly follows its release candidates.
 
 Create a release by changing the value and pushing the commit to `main`:
 
@@ -25,15 +25,33 @@ The previous release tag is the lower boundary of the next changelog. When the r
 
 ## Pipeline behavior
 
-The `CI` workflow runs Go and frontend lint, tests, and production builds for `main` and pull requests. The separate `Release` workflow runs only for a direct push to `main` where `RELEASE` changed, or an explicit recovery dispatch. It does not listen for tags, preventing a release loop. GitHub Actions concurrency serializes publication.
+The `CI` workflow runs Go and frontend lint, tests, and production builds for `main` and pull requests. The separate `Release` workflow runs only for a direct push to `main` where `RELEASE` changed, or an explicit recovery dispatch naming an existing tag. It does not listen for tags, preventing a release loop. GitHub Actions concurrency serializes publication.
 
-Publication order is version validation, full application verification, image build, version image push, `v` image push, optional `latest` push, then GitHub release/tag creation from the exact commit SHA. Compose semantics and the synchronization of `RELEASE`, Compose defaults, Quickstart, and `.env.example` are tested in CI. A recovery dispatch may safely repush image tags and repair an existing release record instead of creating a duplicate. Normal release validation rejects an existing tag before expensive work.
+For a normal release, the workflow resolves the `main` commit that changed `RELEASE` as `source_sha` and derives the build timestamp from that commit. It performs the full Go, frontend, release, Compose, Markdown, and diff verification before publication. It then anchors `vVERSION` to `source_sha`, publishes only the immutable `VERSION` and `vVERSION` image tags, captures their digest, creates the GitHub Release against the same SHA, and finally promotes that exact digest to `latest` for a stable release. A prerelease never runs the `latest` promotion job. Every source-dependent checkout explicitly uses `source_sha`.
+
+The tag is deliberately created after verification and before the first external artifact. If image publication fails, the tag records the only source permitted for recovery. Existing tags are accepted only when they already resolve to the requested source SHA; the workflow never moves or force-updates one. Existing version images are reused only when their OCI revision, version, and source-derived creation timestamp match. GitHub Release target and prerelease state are likewise verified before an existing release is treated as complete.
+
+Partial failures are safe at each boundary: validation or verification publishes nothing; failure after tag anchoring recovers from that tag; failure after image publication reuses the verified digest and repairs the GitHub Release; failure after the GitHub Release promotes only that digest to `latest`. Repeating a completed recovery verifies and reuses immutable artifacts instead of rebuilding them.
+
+Images published before OCI release-identity labels were introduced cannot be proven equivalent by automation. Recovery fails closed when such a legacy version image already exists: a maintainer must inspect its provenance and choose a separate, reviewed migration procedure. The release workflow never overwrites an unverifiable immutable tag.
 
 ## Release notes
 
-The release workflow asks GitHub to generate notes for the exact range between the previous tag and the new release commit. This supplies authoritative pull request links, authors, the full comparison link, and a `New Contributors` section whenever GitHub identifies a contributor's first merged pull request. No contributor file or manual list is maintained.
+The release workflow asks GitHub to generate notes for the exact range between the SemVer-previous tag and the immutable release commit. It enriches every discovered entry with GitHub PR metadata: number, title, author, head branch, labels, merge time, URL, and—only when other evidence is ambiguous—changed files. This preserves authoritative pull request links and GitHub's `New Contributors` section. The final comparison link is constructed explicitly as `previous_tag...current_tag`.
 
-PGSentinel then formats those entries into a Jellyfin-inspired release page with a launch heading, upgrade reminder, counted changelog, and emoji categories for Security, Features, Bug fixes, Performance, Documentation, Dependencies, Tests, Maintenance, and General Changes. Conventional pull request titles such as `feat:`, `fix(security):`, `perf:`, `docs:`, and `chore(deps):` determine the category; unmatched titles appear under General Changes. Apply the `skip-changelog` label before merging a pull request that should not appear in release notes.
+PGSentinel formats entries into Security, Features, Bug fixes, Performance, Documentation, Dependencies, Tests, Maintenance, and General Changes. Classification uses security and dependency evidence first, then conventional titles, known branch prefixes, and finally an all-documentation changed-file fallback. Entries are sorted by merge time (or PR number when merge time is unavailable), making regeneration byte-stable. Conventional prefixes are removed from display titles.
+
+The workflow identifies the PR associated with `source_sha`, requires that it targets `main` and changes `RELEASE`, and excludes it automatically. Ambiguous associations fail closed; a genuine direct push may have no source PR. The `skip-changelog` label remains available for other intentional exclusions. `## Changelog (N)` is calculated only after both exclusions.
+
+### Historical note regeneration
+
+Maintainers can preview corrected notes for an existing immutable release without changing GitHub:
+
+```bash
+./scripts/regenerate-release-notes.sh v0.8.1
+```
+
+The tool verifies `tag -> commit -> RELEASE`, verifies the GitHub Release target, selects the true SemVer predecessor, regenerates and enriches notes, and prints a unified diff plus counts and category metadata. Dry-run is the default. Only an explicit `--apply` edits the public body; review the complete diff first. It never creates or moves tags and never rebuilds an image.
 
 ### Announcement draft
 
@@ -55,7 +73,7 @@ The output includes install and upgrade guidance, short social copy, a project D
 
 Stable `0.7.0` produces `ghcr.io/matta813/pgsentinel:0.7.0`, `:v0.7.0`, and `:latest`. Pre-release `1.0.0-rc.1` produces only `:1.0.0-rc.1` and `:v1.0.0-rc.1`; it never changes `latest`. Pin production to a fixed version.
 
-Build arguments embed version, commit SHA and UTC build time. They are visible at `GET /api/v1/version` and in the sidebar. Local builds remain `dev`, `unknown`, `unknown`.
+Build arguments and OCI labels embed version, immutable source commit SHA, and that commit's timestamp. They are visible at `GET /api/v1/version` and in the sidebar. Recovery therefore reproduces the same application identity even after `main` advances. Local builds remain `dev`, `unknown`, `unknown`.
 
 ## Authentication and protection
 
@@ -67,8 +85,8 @@ Recommended settings: protect `main` with a GitHub ruleset, require the CI check
 
 - **Invalid version:** run `./scripts/test-release.sh` and `./scripts/validate-release.sh RELEASE`.
 - **Version went backwards:** choose a version greater than the newest release under SemVer precedence.
-- **Tag exists:** never reuse versions. For a partial publication, verify the tag target before repairing the release record.
+- **Tag exists:** never reuse versions. Normal retries and recovery proceed only when the tag already points to the resolved source SHA.
 - **Registry denied:** ensure GitHub Actions has `packages: write` and the package is linked to this repository.
 - **Release API denied:** ensure the workflow has `contents: write` and repository Actions are allowed write access.
 - **No release jobs:** ensure this is a direct push to `main` and `RELEASE` actually changed.
-- **Retry after infrastructure failure:** open **Actions → Release → Run workflow**, select `main`, and enable `recover`. This uses the current workflow, safely republishes image tags, and creates or repairs the GitHub Release. Do not rerun an old job when its workflow definition itself was faulty.
+- **Retry after infrastructure failure:** open **Actions → Release → Run workflow**, select `main`, and enter the exact existing tag, such as `v0.8.1`. Recovery resolves the tag commit, verifies its `RELEASE` value, checks any existing image and GitHub Release identity, and repairs only missing publication stages. It never uses current `main` as product source. Do not rerun an old job when its workflow definition itself was faulty.
