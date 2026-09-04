@@ -53,6 +53,16 @@ export function ResourceSummary({
   }
   if (resource === "vacuum") {
     const tables = rows as TableStat[];
+    if (!tables.length && quality?.state !== "fresh")
+      return (
+        <div className="status-panel warning">
+          <strong>Vacuum evidence unavailable</strong>
+          <span>
+            A successful table-statistics snapshot is required before vacuum
+            health can be assessed.
+          </span>
+        </div>
+      );
     const approaching = tables.filter(
       (table) => table.VacuumProgress >= 80,
     ).length;
