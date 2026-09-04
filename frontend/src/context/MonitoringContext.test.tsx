@@ -256,3 +256,58 @@ test("removes a deleted persisted server and safely falls back without leaking i
     );
   });
 });
+
+test("keeps cached database metadata and selection after a failed reload", async () => {
+  const values = new Map([
+    ["monitoring.server", "primary"],
+    ["monitoring.database.primary", "tracearr"],
+  ]);
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  });
+  let databaseLoads = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (String(input).endsWith("/servers"))
+      return new Response(
+        JSON.stringify([{ id: "primary", name: "Primary", tags: [] }]),
+        { status: 200 },
+      );
+    databaseLoads += 1;
+    if (databaseLoads > 1)
+      return new Response(JSON.stringify({ error: "Unavailable" }), {
+        status: 503,
+      });
+    return new Response(
+      JSON.stringify({
+        databases: [
+          { Name: "tracearr" },
+          { Name: "" },
+          { Name: "tracearr" },
+          { Name: "postgres" },
+        ],
+      }),
+      { status: 200 },
+    );
+  });
+  render(
+    <MemoryRouter initialEntries={["/tables"]}>
+      <MonitoringProvider>
+        <Harness />
+      </MonitoringProvider>
+    </MemoryRouter>,
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId("database-list")).toHaveTextContent(
+      "tracearr,postgres",
+    ),
+  );
+  expect(screen.getByTestId("selected-database")).toHaveTextContent("tracearr");
+  fireEvent.click(screen.getByRole("button", { name: "Retry databases" }));
+  expect(await screen.findByText("database unavailable")).toBeInTheDocument();
+  expect(screen.getByTestId("database-list")).toHaveTextContent(
+    "tracearr,postgres",
+  );
+  expect(screen.getByTestId("selected-database")).toHaveTextContent("tracearr");
+});

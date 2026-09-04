@@ -192,3 +192,59 @@ test("shows truthful route-aware context and keeps database selection accessible
   fireEvent.click(screen.getByRole("button", { name: "Switch to dark theme" }));
   expect(document.documentElement.dataset.theme).toBe("dark");
 });
+
+test("renders every known database as a visible selectable option", async () => {
+  const store = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => store.set(key, value),
+    removeItem: (key: string) => store.delete(key),
+  });
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    const body = url.endsWith("/servers")
+      ? [{ id: "server-1", name: "Primary", status: "degraded", tags: [] }]
+      : url.endsWith("/databases")
+        ? {
+            databases: [
+              { Name: "postgres" },
+              { Name: "tracearr" },
+              { Name: "analytics" },
+            ],
+          }
+        : { version: "test", commit: "test" };
+    return new Response(JSON.stringify(body), { status: 200 });
+  });
+  render(
+    <MemoryRouter initialEntries={["/tables"]}>
+      <MonitoringProvider>
+        <Routes>
+          <Route
+            element={
+              <AppLayout
+                username="admin"
+                role="administrator"
+                onLogout={() => undefined}
+              />
+            }
+          >
+            <Route path="tables" element={<p>Tables</p>} />
+          </Route>
+        </Routes>
+      </MonitoringProvider>
+    </MemoryRouter>,
+  );
+  const selector = await screen.findByRole("combobox", {
+    name: "Global database",
+  });
+  await waitFor(() => expect(selector).toBeEnabled());
+  expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+    "Primary · degraded",
+    "All databases",
+    "postgres",
+    "tracearr",
+    "analytics",
+  ]);
+  fireEvent.change(selector, { target: { value: "tracearr" } });
+  expect(selector).toHaveValue("tracearr");
+});

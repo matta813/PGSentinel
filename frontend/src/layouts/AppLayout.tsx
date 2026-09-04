@@ -248,30 +248,33 @@ export function AppLayout({
                     className={`context-selector database-context ${monitoring.databasesError ? "context-error" : ""}`}
                   >
                     <Database />
-                    <span className="context-copy">
+                    <span className="database-select-field">
                       <small>Database</small>
-                      <strong>{databaseContextLabel(monitoring)}</strong>
+                      <select
+                        aria-label="Global database"
+                        value={monitoring.selectedDatabase}
+                        disabled={
+                          monitoring.serversLoading ||
+                          Boolean(monitoring.serversError) ||
+                          !monitoring.selectedServerId ||
+                          (monitoring.databasesLoading &&
+                            !monitoring.databases.length) ||
+                          (Boolean(monitoring.databasesError) &&
+                            !monitoring.databases.length) ||
+                          !monitoring.databases.length
+                        }
+                        onChange={(event) =>
+                          monitoring.setSelectedDatabase(event.target.value)
+                        }
+                      >
+                        <option value="">All databases</option>
+                        {monitoring.databases.map((database) => (
+                          <option value={database.Name} key={database.Name}>
+                            {database.Name}
+                          </option>
+                        ))}
+                      </select>
                     </span>
-                    <select
-                      aria-label="Global database"
-                      value={monitoring.selectedDatabase}
-                      disabled={
-                        monitoring.serversLoading ||
-                        Boolean(monitoring.serversError) ||
-                        !monitoring.selectedServerId ||
-                        monitoring.databasesLoading ||
-                        Boolean(monitoring.databasesError) ||
-                        !monitoring.databases.length
-                      }
-                      onChange={(event) =>
-                        monitoring.setSelectedDatabase(event.target.value)
-                      }
-                    >
-                      <option value="">All databases</option>
-                      {monitoring.databases.map((database) => (
-                        <option key={database.Name}>{database.Name}</option>
-                      ))}
-                    </select>
                     <ChevronsUpDown />
                   </label>
                   {monitoring.databasesError && (
@@ -318,16 +321,6 @@ export function AppLayout({
       </main>
     </div>
   );
-}
-
-function databaseContextLabel(monitoring: ReturnType<typeof useMonitoring>) {
-  if (monitoring.serversLoading) return "Waiting for server list…";
-  if (monitoring.serversError) return "Database list unavailable";
-  if (!monitoring.selectedServerId) return "No server selected";
-  if (monitoring.databasesLoading) return "Loading databases…";
-  if (monitoring.databasesError) return "Database list unavailable";
-  if (!monitoring.databases.length) return "No databases collected";
-  return monitoring.selectedDatabase || "All databases";
 }
 
 function serverContextLabel(monitoring: ReturnType<typeof useMonitoring>) {

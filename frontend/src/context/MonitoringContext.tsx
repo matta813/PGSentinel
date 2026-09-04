@@ -80,9 +80,21 @@ export function MonitoringProvider({ children }: { children: ReactNode }) {
     [effectiveServerId, databaseScopeEnabled],
   );
   const databases = useMemo(
-    () =>
-      databaseResult.loading ? [] : (databaseResult.data?.databases ?? []),
-    [databaseResult.data, databaseResult.loading],
+    () => {
+      const seen = new Set<string>();
+      return (databaseResult.data?.databases ?? []).reduce<DatabaseStat[]>(
+        (items, database) => {
+          const name =
+            typeof database.Name === "string" ? database.Name.trim() : "";
+          if (!name || seen.has(name)) return items;
+          seen.add(name);
+          items.push({ ...database, Name: name });
+          return items;
+        },
+        [],
+      );
+    },
+    [databaseResult.data],
   );
   const requestedDatabase =
     databaseSelection.serverId === effectiveServerId
