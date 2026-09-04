@@ -260,3 +260,73 @@ test.each([
     else expect(screen.queryByText("Observed indexes")).not.toBeInTheDocument();
   },
 );
+
+test.each([
+  ["fresh", [], "Tables monitored", "0"],
+  ["partial", [], "Vacuum evidence unavailable", null],
+  ["unavailable", [], "Vacuum evidence unavailable", null],
+  [
+    "unavailable",
+    [
+      {
+        Database: "app",
+        Schema: "public",
+        Table: "events",
+        EstimatedRows: 100,
+        TotalSize: 8192,
+        DeadTuples: 4,
+        LiveTuples: 96,
+        VacuumThreshold: 50,
+        VacuumProgress: 8,
+      },
+    ],
+    "Tables monitored",
+    "1",
+  ],
+] as const)(
+  "renders %s vacuum evidence without turning collection failure into healthy zeroes",
+  async (state, tables, expectedLabel, expectedValue) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/servers"))
+        return new Response(
+          JSON.stringify([
+            { id: "server-1", name: "Primary", status: "degraded", tags: [] },
+          ]),
+          { status: 200 },
+        );
+      if (url.endsWith("/databases"))
+        return new Response(
+          JSON.stringify({ databases: [{ Name: "app" }] }),
+          { status: 200 },
+        );
+      if (url.endsWith("/freshness"))
+        return new Response(
+          JSON.stringify([
+            {
+              serverId: "server-1",
+              resource: "vacuum",
+              state,
+              expectedIntervalSeconds: 300,
+              consecutiveFailures: state === "fresh" ? 0 : 2,
+            },
+          ]),
+          { status: 200 },
+        );
+      return new Response(JSON.stringify(tables), { status: 200 });
+    });
+    render(
+      <MemoryRouter initialEntries={["/vacuum"]}>
+        <MonitoringProvider>
+          <Routes>
+            <Route path="/:resource" element={<ResourcePage />} />
+          </Routes>
+        </MonitoringProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(expectedLabel)).toBeInTheDocument();
+    if (expectedValue !== null)
+      expect(screen.getAllByText(expectedValue).length).toBeGreaterThan(0);
+    else expect(screen.queryByText("Tables monitored")).not.toBeInTheDocument();
+  },
+);
