@@ -20,6 +20,10 @@ grep -Fq 'docker/build-push-action@' "$release"
 grep -Fq 'provenance: mode=max' "$release"
 grep -Fq 'workflows: [Release]' "$announcement"
 grep -Fq 'contents: read' "$announcement"
+if grep -Eq 'github\.event\.workflow_run\.(head_sha|head_branch)' "$announcement"; then
+  echo "release announcement must not check out workflow_run-controlled revisions" >&2
+  exit 1
+fi
 grep -Fq 'cron: "17 8 * * 1"' "$growth"
 grep -Fq 'actions: read' "$growth"
 grep -Fq 'issues: read' "$growth"
