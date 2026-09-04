@@ -19,6 +19,9 @@ func (s Schedule) normalized() Schedule {
 	if s.Metadata <= 0 {
 		s.Metadata = 30 * time.Minute
 	}
+	if s.DiagnosticInterval <= 0 {
+		s.DiagnosticInterval = 5 * time.Minute
+	}
 	if s.Retention <= 0 {
 		s.Retention = 30 * 24 * time.Hour
 	}

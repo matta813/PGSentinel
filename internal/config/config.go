@@ -24,6 +24,7 @@ type Config struct {
 	StatsInterval                   time.Duration
 	SlowInterval                    time.Duration
 	MetaInterval                    time.Duration
+	CollectorDiagnosticInterval     time.Duration
 	Retention                       time.Duration
 	MetricRawRetention              time.Duration
 	MetricMediumRetention           time.Duration
@@ -55,6 +56,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	collectorDiagnosticInterval, err := strictDuration("PGSENTINEL_COLLECTOR_DIAGNOSTIC_INTERVAL", 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
 	c := Config{
 		ListenAddr: env("PGSENTINEL_LISTEN_ADDR", ":8080"), DataDir: dataDir,
 		DatabasePath:  filepath.Join(dataDir, "pgsentinel.db"),
@@ -64,13 +69,14 @@ func Load() (Config, error) {
 		TrustedProxyCIDRs:        list("PGSENTINEL_TRUSTED_PROXY_CIDRS"),
 		FastInterval:             duration("PGSENTINEL_FAST_INTERVAL", 5*time.Second), StatsInterval: duration("PGSENTINEL_STATS_INTERVAL", 30*time.Second),
 		SlowInterval: duration("PGSENTINEL_SLOW_INTERVAL", 5*time.Minute), MetaInterval: duration("PGSENTINEL_META_INTERVAL", 30*time.Minute),
-		Retention:               duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
-		MetricRawRetention:      metricRawRetention,
-		MetricMediumRetention:   metricMediumRetention,
-		MetricLongRetention:     metricLongRetention,
-		FanoutDatabaseLimit:     positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
-		MaxSnapshotsPerResource: positiveInt("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE", 120),
-		FrontendDir:             env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
+		CollectorDiagnosticInterval: collectorDiagnosticInterval,
+		Retention:                   duration("PGSENTINEL_RETENTION", 30*24*time.Hour),
+		MetricRawRetention:          metricRawRetention,
+		MetricMediumRetention:       metricMediumRetention,
+		MetricLongRetention:         metricLongRetention,
+		FanoutDatabaseLimit:         positiveInt("PGSENTINEL_FANOUT_DATABASE_LIMIT", 32),
+		MaxSnapshotsPerResource:     positiveInt("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE", 120),
+		FrontendDir:                 env("PGSENTINEL_FRONTEND_DIR", "./frontend/dist"),
 	}
 	if c.EncryptionKey == "" {
 		return Config{}, fmt.Errorf("PGSENTINEL_ENCRYPTION_KEY is required; generate one with openssl rand -base64 32")
@@ -92,6 +98,9 @@ func Load() (Config, error) {
 	}
 	if c.MaxSnapshotsPerResource < 10 || c.MaxSnapshotsPerResource > 10000 {
 		return Config{}, fmt.Errorf("PGSENTINEL_MAX_SNAPSHOTS_PER_RESOURCE must be between 10 and 10000")
+	}
+	if c.CollectorDiagnosticInterval < 10*time.Second || c.CollectorDiagnosticInterval > time.Hour {
+		return Config{}, fmt.Errorf("PGSENTINEL_COLLECTOR_DIAGNOSTIC_INTERVAL must be between 10s and 1h")
 	}
 	if err := os.MkdirAll(c.DataDir, 0o750); err != nil {
 		return Config{}, fmt.Errorf("create data directory: %w", err)

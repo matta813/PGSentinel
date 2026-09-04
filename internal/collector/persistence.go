@@ -33,6 +33,7 @@ func (m *Manager) reconcileFindings(ctx context.Context, serverID string, findin
 func (m *Manager) restoreSnapshot(ctx context.Context, serverID, kind string, value any) bool {
 	err := m.store.LatestSnapshot(ctx, serverID, kind, value)
 	if err == nil {
+		m.diagnostics.cached(serverID, kind, time.Now())
 		return true
 	}
 	if errors.Is(err, sql.ErrNoRows) {

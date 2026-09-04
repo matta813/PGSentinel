@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/matta813/pgsentinel/internal/models"
 	pg "github.com/matta813/pgsentinel/internal/postgres"
@@ -33,25 +34,34 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		if ctx.Err() != nil {
 			return
 		}
+		connectStarted := time.Now()
 		client, err := pg.ConnectDatabase(ctx, server, database.Name)
 		if err != nil {
 			complete = false
-			m.log.Warn("per-database collection failed", "server_id", server.ID, "database", database.Name, "error", err)
+			duration := time.Since(connectStarted)
+			m.diagnostics.failed(server.ID, database.Name, "tables", "connect", err, duration, time.Now())
+			m.diagnostics.failed(server.ID, database.Name, "indexes", "connect", err, duration, time.Now())
 			continue
 		}
 		core := NewCore(client.Pool())
+		tableStarted := time.Now()
 		databaseTables, err := core.CollectTables(ctx, database.Name)
+		tableDuration := time.Since(tableStarted)
 		if err != nil {
 			complete = false
-			m.log.Warn("collect tables", "server_id", server.ID, "database", database.Name, "error", err)
+			m.diagnostics.failed(server.ID, database.Name, "tables", "tables", err, tableDuration, time.Now())
 		} else {
+			m.diagnostics.succeeded(server.ID, database.Name, "tables", "tables", tableDuration)
 			tables = append(tables, databaseTables...)
 		}
+		indexStarted := time.Now()
 		databaseIndexes, err := core.CollectIndexes(ctx)
+		indexDuration := time.Since(indexStarted)
 		if err != nil {
 			complete = false
-			m.log.Warn("collect indexes", "server_id", server.ID, "database", database.Name, "error", err)
+			m.diagnostics.failed(server.ID, database.Name, "indexes", "indexes", err, indexDuration, time.Now())
 		} else {
+			m.diagnostics.succeeded(server.ID, database.Name, "indexes", "indexes", indexDuration)
 			indexes = append(indexes, databaseIndexes...)
 		}
 		client.Close()
