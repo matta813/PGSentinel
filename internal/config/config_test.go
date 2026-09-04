@@ -28,8 +28,28 @@ func TestLoadDefaults(t *testing.T) {
 	if c.FanoutDatabaseLimit != 32 {
 		t.Fatalf("default fanout database limit = %d, want 32", c.FanoutDatabaseLimit)
 	}
+	if c.CollectorDiagnosticInterval != 5*time.Minute {
+		t.Fatalf("collector diagnostic interval = %s, want 5m", c.CollectorDiagnosticInterval)
+	}
 	if c.MetricRawRetention != 24*time.Hour || c.MetricMediumRetention != 30*24*time.Hour || c.MetricLongRetention != 365*24*time.Hour {
 		t.Fatalf("unexpected metric retention defaults: %+v", c)
+	}
+}
+
+func TestLoadValidatesCollectorDiagnosticInterval(t *testing.T) {
+	t.Setenv("PGSENTINEL_DATA_DIR", t.TempDir())
+	t.Setenv("PGSENTINEL_ENCRYPTION_KEY", "test-encryption-key-32-chars-min")
+	t.Setenv("PGSENTINEL_ADMIN_PASSWORD", "a-secure-test-password")
+	t.Setenv("PGSENTINEL_COLLECTOR_DIAGNOSTIC_INTERVAL", "30s")
+	c, err := Load()
+	if err != nil || c.CollectorDiagnosticInterval != 30*time.Second {
+		t.Fatalf("valid interval rejected: %+v, %v", c, err)
+	}
+	for _, value := range []string{"invalid", "5s", "2h"} {
+		t.Setenv("PGSENTINEL_COLLECTOR_DIAGNOSTIC_INTERVAL", value)
+		if _, err := Load(); err == nil {
+			t.Fatalf("invalid interval %q was accepted", value)
+		}
 	}
 }
 

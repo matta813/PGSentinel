@@ -10,6 +10,7 @@ import (
 )
 
 func (m *Manager) collect(ctx context.Context, server models.Server, cycle collectionCycle) {
+	cycleStarted := time.Now()
 	complete := true
 	var regressionFindings []models.Finding
 	target, err := m.store.GetServer(ctx, server.ID, true)
@@ -237,5 +238,5 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 	}
 	status, lastError := collectionOutcome(complete)
 	_ = m.store.UpdateServerStatus(ctx, server.ID, status, snapshot.Version, lastError, true)
-	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings))
+	m.log.Info("monitoring cycle complete", "server_id", server.ID, "cycle", cycle, "findings", len(findings), "complete", complete, "duration", time.Since(cycleStarted))
 }
