@@ -24,8 +24,8 @@ func collectibleDatabases(stats []models.DatabaseStat, limit int) []models.Datab
 	return out
 }
 
-func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, databaseStats []models.DatabaseStat) (tables []models.TableStat, indexes []models.IndexStat, complete bool) {
-	complete = true
+func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, databaseStats []models.DatabaseStat) (tables []models.TableStat, indexes []models.IndexStat, tablesComplete bool, indexesComplete bool) {
+	tablesComplete, indexesComplete = true, true
 	targets := collectibleDatabases(databaseStats, m.schedule.FanoutLimit)
 	if len(targets) == 0 {
 		targets = []models.DatabaseStat{{Name: "postgres"}}
@@ -37,7 +37,7 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		connectStarted := time.Now()
 		client, err := pg.ConnectDatabase(ctx, server, database.Name)
 		if err != nil {
-			complete = false
+			tablesComplete, indexesComplete = false, false
 			duration := time.Since(connectStarted)
 			m.diagnostics.failed(server.ID, database.Name, "tables", "connect", err, duration, time.Now())
 			m.diagnostics.failed(server.ID, database.Name, "indexes", "connect", err, duration, time.Now())
@@ -48,7 +48,7 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		databaseTables, err := core.CollectTables(ctx, database.Name)
 		tableDuration := time.Since(tableStarted)
 		if err != nil {
-			complete = false
+			tablesComplete = false
 			m.diagnostics.failed(server.ID, database.Name, "tables", "tables", err, tableDuration, time.Now())
 		} else {
 			m.diagnostics.succeeded(server.ID, database.Name, "tables", "tables", tableDuration)
@@ -58,7 +58,7 @@ func (m *Manager) collectPerDatabase(ctx context.Context, server models.Server, 
 		databaseIndexes, err := core.CollectIndexes(ctx)
 		indexDuration := time.Since(indexStarted)
 		if err != nil {
-			complete = false
+			indexesComplete = false
 			m.diagnostics.failed(server.ID, database.Name, "indexes", "indexes", err, indexDuration, time.Now())
 		} else {
 			m.diagnostics.succeeded(server.ID, database.Name, "indexes", "indexes", indexDuration)
