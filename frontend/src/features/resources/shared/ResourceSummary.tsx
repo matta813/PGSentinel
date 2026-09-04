@@ -21,6 +21,16 @@ export function ResourceSummary({
   if (database && data.length > 0 && rows.length === 0) return null;
   if (resource === "indexes") {
     const indexes = rows as IndexStat[];
+    if (!indexes.length && quality?.state !== "fresh")
+      return (
+        <div className="status-panel warning">
+          <strong>Index evidence unavailable</strong>
+          <span>
+            A successful index snapshot is required before index counts and
+            usage can be assessed.
+          </span>
+        </div>
+      );
     const candidates = indexes.filter(
       (index) => index.Scans === 0 && !index.Primary && !index.Unique,
     ).length;

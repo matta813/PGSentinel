@@ -165,15 +165,10 @@ func (m *Manager) collect(ctx context.Context, server models.Server, cycle colle
 		if !tablesFresh {
 			complete = false
 		}
-		if indexesComplete {
-			snapshot.Indexes = indexes
-			if !m.saveSnapshot(ctx, server.ID, "indexes", snapshot.Indexes, snapshot.CollectedAt, m.schedule.Slow) {
-				complete = false
-			}
-		} else {
-			_ = m.restoreSnapshot(ctx, server.ID, "indexes", &snapshot.Indexes)
+		var indexesFresh bool
+		snapshot.Indexes, indexesFresh = m.persistIndexCollection(ctx, server.ID, indexes, indexesComplete, snapshot.CollectedAt)
+		if !indexesFresh {
 			complete = false
-			m.recordPartial(ctx, server.ID, "indexes", m.schedule.Slow, snapshot.CollectedAt)
 		}
 		if tablesFresh {
 			m.recordFresh(ctx, server.ID, "vacuum", m.schedule.Slow, snapshot.CollectedAt)

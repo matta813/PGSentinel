@@ -65,6 +65,27 @@ func (m *Manager) persistTableCollection(ctx context.Context, serverID string, c
 	return collected, false
 }
 
+func (m *Manager) persistIndexCollection(ctx context.Context, serverID string, collected []models.IndexStat, complete bool, at time.Time) ([]models.IndexStat, bool) {
+	if complete {
+		if m.saveSnapshot(ctx, serverID, "indexes", collected, at, m.schedule.Slow) {
+			return collected, true
+		}
+		return collected, false
+	}
+	var cached []models.IndexStat
+	if m.restoreSnapshot(ctx, serverID, "indexes", &cached) {
+		m.recordPartial(ctx, serverID, "indexes", m.schedule.Slow, at)
+		return cached, false
+	}
+	if len(collected) > 0 {
+		if err := m.store.SaveSnapshot(ctx, serverID, "indexes", collected, at); err != nil {
+			m.log.Warn("save partial index snapshot", "server_id", serverID, "error", err)
+		}
+	}
+	m.recordPartial(ctx, serverID, "indexes", m.schedule.Slow, at)
+	return collected, false
+}
+
 func restoreCapabilities(ctx context.Context, store *storage.Store, serverID string, snapshot *models.Snapshot) {
 	var previous models.Snapshot
 	if err := store.LatestSnapshot(ctx, serverID, "core", &previous); err != nil || previous.Capabilities == nil {

@@ -211,3 +211,52 @@ test("renders resource data when optional freshness metadata is unavailable", as
     screen.getByText("Current evidence is unavailable"),
   ).toBeInTheDocument();
 });
+
+test.each([
+  ["fresh", "Observed indexes", "0"],
+  ["partial", "Index evidence unavailable", null],
+  ["unavailable", "Index evidence unavailable", null],
+] as const)(
+  "distinguishes %s empty index evidence from an unavailable collection",
+  async (state, expectedLabel, expectedValue) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/servers"))
+        return new Response(
+          JSON.stringify([
+            { id: "server-1", name: "Primary", status: "degraded", tags: [] },
+          ]),
+          { status: 200 },
+        );
+      if (url.endsWith("/databases"))
+        return new Response(JSON.stringify({ databases: [] }), { status: 200 });
+      if (url.endsWith("/freshness"))
+        return new Response(
+          JSON.stringify([
+            {
+              serverId: "server-1",
+              resource: "indexes",
+              state,
+              expectedIntervalSeconds: 300,
+              consecutiveFailures: state === "fresh" ? 0 : 2,
+            },
+          ]),
+          { status: 200 },
+        );
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    render(
+      <MemoryRouter initialEntries={["/indexes"]}>
+        <MonitoringProvider>
+          <Routes>
+            <Route path="/:resource" element={<ResourcePage />} />
+          </Routes>
+        </MonitoringProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(expectedLabel)).toBeInTheDocument();
+    if (expectedValue !== null)
+      expect(screen.getAllByText(expectedValue).length).toBeGreaterThan(0);
+    else expect(screen.queryByText("Observed indexes")).not.toBeInTheDocument();
+  },
+);
