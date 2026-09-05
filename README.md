@@ -1,5 +1,7 @@
 # PGSentinel
 
+<img src="docs/assets/brand/pgsentinel-logo.svg" alt="PGSentinel" width="260" height="48" />
+
 **PostgreSQL health intelligence for operators who need answers, not another wall of graphs.**
 
 PGSentinel turns PostgreSQL telemetry into an operations inbox: what is wrong, how severe it is, the evidence behind it, why it matters, and what to investigate next. It is self-hosted, read-only toward monitored databases, and built for PostgreSQL 15+.

@@ -1,9 +1,9 @@
+import { BrandMark } from "../components/BrandMark";
 import {
   Activity,
   AlertTriangle,
   ChevronsUpDown,
   Database,
-  FileSearch,
   Gauge,
   GitBranch,
   KeyRound,
@@ -138,7 +138,7 @@ export function AppLayout({
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="brand">
           <span className="brand-mark">
-            <FileSearch />
+            <BrandMark />
           </span>
           <div>
             <strong>PGSentinel</strong>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 48" role="img" aria-labelledby="title">
+  <title id="title">PGSentinel</title>
+  <style>:root { color: #168a7a; } text { fill: #172b35; } @media (prefers-color-scheme: dark) { :root { color: #42b9a4; } text { fill: #eef5f4; } }</style>
+  <g transform="translate(2 4) scale(1.25)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="16" cy="7" rx="11" ry="4"/>
+  <path d="M5 7v18c0 2.2 4.9 4 11 4s11-1.8 11-4V7"/>
+  <path d="M5 18s4-6 11-6 11 6 11 6-4 6-11 6-11-6-11-6Z"/>
+  <circle cx="16" cy="18" r="3" fill="currentColor" stroke="none"/></g>
+  <text x="54" y="34" font-family="system-ui, sans-serif" font-size="32" font-weight="650">PGSentinel</text>
+</svg>
